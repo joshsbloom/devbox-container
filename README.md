@@ -40,26 +40,30 @@ If you're comfortable with HPC clusters, here's the short version:
 ssh <user>@hoffman2.idre.ucla.edu
 
 # 2. Get the scripts (one-time)
-git clone https://github.com/joshsbloom/devbox-container.git ~/devbox-container
-mkdir -p ~/bin
-ln -sf ~/devbox-container/launch-devbox.sh ~/bin/launch-devbox.sh
-ln -sf ~/devbox-container/devbox-setup.sh ~/bin/devbox-setup.sh
-echo 'module load singularity' >> ~/.bashrc && source ~/.bashrc
+git clone https://github.com/joshsbloom/devbox-container.git ~/Local/devbox-container
+mkdir -p ~/Local/bin
+ln -sf ~/Local/devbox-container/launch-devbox.sh ~/Local/bin/launch-devbox.sh
+ln -sf ~/Local/devbox-container/devbox-setup.sh ~/Local/bin/devbox-setup.sh
 
-# 3. Get a compute node (setup needs resources — don't run on the login node)
+# 3. Add to your PATH so you can run "launch-devbox.sh" from anywhere (one-time)
+echo 'export PATH="$HOME/Local/bin:$PATH"' >> ~/.bashrc
+echo 'module load singularity' >> ~/.bashrc
+source ~/.bashrc
+
+# 4. Get a compute node (setup needs resources — don't run on the login node)
 qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
 
-# 4. First-time setup (creates conda env with base packages)
-~/bin/launch-devbox.sh setup
+# 5. First-time setup (creates conda env with base packages)
+launch-devbox.sh setup
 
-# 5. Optionally add domain-specific packages (additive — install anytime)
-~/bin/launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor
-~/bin/launch-devbox.sh setup --with ml         # PyTorch with CUDA
-~/bin/launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms
-~/bin/launch-devbox.sh setup --with all        # everything
+# 6. Optionally add domain-specific packages (additive — install anytime)
+launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor
+launch-devbox.sh setup --with ml         # PyTorch with CUDA
+launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms
+launch-devbox.sh setup --with all        # everything
 
-# 6. Start working
-~/bin/launch-devbox.sh shell
+# 7. Start working
+launch-devbox.sh shell
 ```
 
 ## What you can do
@@ -96,6 +100,7 @@ DEVBOX_ENV=myproject launch-devbox.sh shell
 | Document | Audience | Contents |
 |----------|----------|----------|
 | **[README-user.md](README-user.md)** | Everyone | Step-by-step setup, SSH tunneling, using each service, installing packages, troubleshooting |
+| **[README-hoffman2.md](README-hoffman2.md)** | Everyone | Hoffman2 filesystem layout, storage quotas, best practices, job scheduler tips |
 | **[README-build.md](README-build.md)** | Admins | Building the container, deploying to the cluster, common build issues |
 | **[README-architecture.md](README-architecture.md)** | Anyone curious | Why each piece exists, design decisions, deploying on other clusters |
 
@@ -107,6 +112,7 @@ launch-devbox.sh     # Launch script (env setup, GPU detection, tunneling)
 devbox-setup.sh      # First-time user setup (creates conda environment)
 README.md            # This file
 README-user.md       # User guide
+README-hoffman2.md   # Hoffman2 best practices and filesystem guide
 README-build.md      # Build and deploy guide
 README-architecture.md  # Architecture and design rationale
 ```

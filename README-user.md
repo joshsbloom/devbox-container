@@ -32,21 +32,24 @@ https://www.hoffman2.idre.ucla.edu/SBO/devel/About/FAQ/FAQ.html#set-up-ssh-publi
 
 ### Step 2: Get the scripts (one-time)
 
-    git clone https://github.com/joshsbloom/devbox-container.git ~/devbox-container
-    mkdir -p ~/bin
-    ln -sf ~/devbox-container/launch-devbox.sh ~/bin/launch-devbox.sh
-    ln -sf ~/devbox-container/devbox-setup.sh ~/bin/devbox-setup.sh
+    git clone https://github.com/joshsbloom/devbox-container.git ~/Local/devbox-container
+    mkdir -p ~/Local/bin
+    ln -sf ~/Local/devbox-container/launch-devbox.sh ~/Local/bin/launch-devbox.sh
+    ln -sf ~/Local/devbox-container/devbox-setup.sh ~/Local/bin/devbox-setup.sh
 
-This clones the devbox repository and creates symlinks in `~/bin` so you
-can run the scripts from anywhere. You only need to do this once.
+This clones the devbox repository into `~/Local/devbox-container` and
+creates symlinks in `~/Local/bin` so the scripts are easy to run.
 
-### Step 3: Load the container runtime (one-time)
+### Step 3: Set up your shell (one-time)
 
+    echo 'export PATH="$HOME/Local/bin:$PATH"' >> ~/.bashrc
     echo 'module load singularity' >> ~/.bashrc
     source ~/.bashrc
 
-Hoffman2 uses `module load` to make software available. This adds
-Singularity (the tool that runs containers) to every future session.
+This does two things:
+- Adds `~/Local/bin` to your `PATH`, so you can type `launch-devbox.sh`
+  instead of the full path `~/Local/bin/launch-devbox.sh`
+- Loads Singularity (the tool that runs containers) in every future session
 
 ### Step 4: Get a compute node
 
@@ -65,7 +68,7 @@ later for SSH tunneling.
 
 ### Step 5: Run first-time setup
 
-    ~/bin/launch-devbox.sh setup
+    launch-devbox.sh setup
 
 This creates your personal conda environment with R, Python, Node.js, and
 core packages. It takes about 15-20 minutes on the first run. You'll see
@@ -73,13 +76,17 @@ progress as packages are downloaded and installed.
 
 ### Step 6: Start working
 
-    ~/bin/launch-devbox.sh shell
+    launch-devbox.sh shell
 
 You're now inside the devbox container with R, Python, and all your tools
 available. Your prompt will show `(devbox)` to indicate you're in the
 container environment.
 
 To exit the container, type `exit` or press `Ctrl-d`.
+
+**Next step:** Read the [Hoffman2 best practices guide](README-hoffman2.md)
+to understand the filesystem layout and how to manage storage — especially
+important to avoid filling your home directory quota.
 
 ---
 
@@ -88,16 +95,16 @@ To exit the container, type `exit` or press `Ctrl-d`.
 Once setup is complete, these are the commands you'll use day-to-day.
 All commands are run **on a compute node** (after `qrsh`):
 
-    ~/bin/launch-devbox.sh shell          # Interactive shell
-    ~/bin/launch-devbox.sh code-server    # VS Code in browser (port 8080)
-    ~/bin/launch-devbox.sh rstudio        # RStudio in browser (port 8787)
-    ~/bin/launch-devbox.sh jupyter        # JupyterLab in browser (port 8888)
-    ~/bin/launch-devbox.sh claude         # Claude Code CLI
-    ~/bin/launch-devbox.sh codex          # OpenAI Codex CLI
-    ~/bin/launch-devbox.sh gpu-job        # Request a GPU node, then launch shell
-    ~/bin/launch-devbox.sh exec <cmd>     # Run any command in the container
+    launch-devbox.sh shell          # Interactive shell
+    launch-devbox.sh code-server    # VS Code in browser (port 8080)
+    launch-devbox.sh rstudio        # RStudio in browser (port 8787)
+    launch-devbox.sh jupyter        # JupyterLab in browser (port 8888)
+    launch-devbox.sh claude         # Claude Code CLI
+    launch-devbox.sh codex          # OpenAI Codex CLI
+    launch-devbox.sh gpu-job        # Request a GPU node, then launch shell
+    launch-devbox.sh exec <cmd>     # Run any command in the container
 
-Run `~/bin/launch-devbox.sh` with no arguments to see all options.
+Run `launch-devbox.sh` with no arguments to see all options.
 
 ---
 
@@ -110,21 +117,21 @@ The base setup gives you R, Python, Node.js, core data science packages
 For domain-specific packages, install **profiles**. Profiles are additive —
 you can add them at any time without reinstalling anything:
 
-    ~/bin/launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor, snakemake
-    ~/bin/launch-devbox.sh setup --with ml         # PyTorch with CUDA support
-    ~/bin/launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms, Bioconductor, etc.
-    ~/bin/launch-devbox.sh setup --with all        # everything
+    launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor, snakemake
+    launch-devbox.sh setup --with ml         # PyTorch with CUDA support
+    launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms, Bioconductor, etc.
+    launch-devbox.sh setup --with all        # everything
 
 You can combine profiles in one command: `--with bioinfo,ml`
 
 You can also install profiles during the initial setup:
 
-    ~/bin/launch-devbox.sh setup --with all
+    launch-devbox.sh setup --with all
 
 To start over with a clean environment:
 
     mamba env remove -p ~/.devbox/conda/envs/devbox
-    ~/bin/launch-devbox.sh setup --with bioinfo,ml
+    launch-devbox.sh setup --with bioinfo,ml
 
 ---
 
@@ -173,7 +180,7 @@ to port `8080` on compute node `n7234`, going through Hoffman2."
 
 **1. Start the service on the compute node** (in your existing SSH session):
 
-    ~/bin/launch-devbox.sh code-server
+    launch-devbox.sh code-server
 
 The script prints the exact tunnel command you need — just copy it:
 
@@ -203,9 +210,9 @@ through the login node to the compute node, and code-server responds.
 
 If a port is in use (another user on the same node), change it:
 
-    CODE_SERVER_PORT=8081 ~/bin/launch-devbox.sh code-server
-    RSTUDIO_PORT=8788 ~/bin/launch-devbox.sh rstudio
-    JUPYTER_PORT=8889 ~/bin/launch-devbox.sh jupyter
+    CODE_SERVER_PORT=8081 launch-devbox.sh code-server
+    RSTUDIO_PORT=8788 launch-devbox.sh rstudio
+    JUPYTER_PORT=8889 launch-devbox.sh jupyter
 
 ### Avoid typing your password every time
 
@@ -257,7 +264,7 @@ terminal session that lives on the server.
     tmux new -s devbox
 
     # Now launch your service inside tmux
-    ~/bin/launch-devbox.sh code-server
+    launch-devbox.sh code-server
 
 If your SSH drops, reconnect and reattach:
 
@@ -272,15 +279,15 @@ Use tmux panes to run several services side by side:
     tmux new -s devbox
 
     # Pane 1: code-server
-    ~/bin/launch-devbox.sh code-server
+    launch-devbox.sh code-server
 
     # Ctrl-b %  (split vertically — creates a new pane to the right)
     # Pane 2: RStudio
-    ~/bin/launch-devbox.sh rstudio
+    launch-devbox.sh rstudio
 
     # Ctrl-b "  (split horizontally — creates a new pane below)
     # Pane 3: interactive shell
-    ~/bin/launch-devbox.sh shell
+    launch-devbox.sh shell
 
 ### Quick tmux reference
 
@@ -303,7 +310,7 @@ it) would still die if the connection drops.
 ## VS Code (code-server)
 
     # On compute node
-    ~/bin/launch-devbox.sh code-server
+    launch-devbox.sh code-server
 
     # Tunnel from laptop (in a new terminal)
     ssh -L 8080:<node>:8080 hoffman2
@@ -333,7 +340,7 @@ already included in the devbox environment, so it should work immediately.
 ## RStudio Server
 
     # On compute node
-    ~/bin/launch-devbox.sh rstudio
+    launch-devbox.sh rstudio
 
 The script prints your login credentials:
 
@@ -351,7 +358,7 @@ packages installed via `install.packages()`, `BiocManager::install()`, or
 
 To set a persistent password instead of a random one:
 
-    RSTUDIO_PASSWORD=mypassword ~/bin/launch-devbox.sh rstudio
+    RSTUDIO_PASSWORD=mypassword launch-devbox.sh rstudio
 
 ---
 
@@ -365,7 +372,7 @@ Claude Code supports two auth methods:
 
 **Option A: Subscription (Claude Pro/Max) — recommended**
 
-    ~/bin/launch-devbox.sh shell
+    launch-devbox.sh shell
 
     # Inside the container
     claude
@@ -387,10 +394,10 @@ After first-time auth (either method), Claude Code caches credentials in
 ### Usage
 
     # Interactive mode
-    ~/bin/launch-devbox.sh claude
+    launch-devbox.sh claude
 
     # One-shot command
-    ~/bin/launch-devbox.sh claude "explain this Snakefile"
+    launch-devbox.sh claude "explain this Snakefile"
 
     # From inside a devbox shell
     claude
@@ -405,7 +412,7 @@ OpenAI's Codex CLI is another AI coding agent.
 
 **Option A: ChatGPT subscription (Plus/Pro/Team)**
 
-    ~/bin/launch-devbox.sh shell
+    launch-devbox.sh shell
 
     # Inside the container
     codex
@@ -423,7 +430,7 @@ OpenAI's Codex CLI is another AI coding agent.
 
 ### Usage
 
-    ~/bin/launch-devbox.sh codex
+    launch-devbox.sh codex
 
     # From inside a devbox shell
     codex
@@ -436,10 +443,10 @@ OpenAI's Codex CLI is another AI coding agent.
     qrsh -l gpu,V100,h_data=16G,h_rt=4:00:00 -pe shared 4
 
     # Or let the script handle it
-    GPU_TYPE=V100 ~/bin/launch-devbox.sh gpu-job
+    GPU_TYPE=V100 launch-devbox.sh gpu-job
 
     # The script auto-detects GPUs — no extra flags needed
-    ~/bin/launch-devbox.sh shell
+    launch-devbox.sh shell
     # → "[devbox] GPU detected — enabling --nv"
 
     # Verify inside the container
@@ -462,7 +469,7 @@ environments for specific projects:
     mamba create -n myproject python=3.11 pandas scikit-learn
 
     # Launch a shell using that environment
-    DEVBOX_ENV=myproject ~/bin/launch-devbox.sh shell
+    DEVBOX_ENV=myproject launch-devbox.sh shell
 
 Custom environments are stored alongside `devbox` in `~/.devbox/conda/envs/`
 and are managed with standard conda/mamba commands (`conda activate`,
@@ -481,7 +488,7 @@ shell session and is never overwritten by the launch script.
 To see the underlying Singularity/Apptainer commands that devbox runs
 (useful for learning or debugging):
 
-    ~/bin/launch-devbox.sh --verbose shell
+    launch-devbox.sh --verbose shell
 
 ---
 
@@ -506,26 +513,26 @@ affect your files, projects, or API keys — only the installed packages.
 Run these from a compute node:
 
     # 1. Remove the existing environment
-    ~/bin/launch-devbox.sh exec mamba env remove -p ~/.devbox/conda/envs/devbox -y
+    launch-devbox.sh exec mamba env remove -p ~/.devbox/conda/envs/devbox -y
 
     # 2. Recreate it (base packages only)
-    ~/bin/launch-devbox.sh setup
+    launch-devbox.sh setup
 
     # 3. Re-add any profiles you had before
-    ~/bin/launch-devbox.sh setup --with bioinfo,ml,r-extra
+    launch-devbox.sh setup --with bioinfo,ml,r-extra
 
     # 4. Re-install any extra packages you added manually
     #    (check ~/.devbox/installed_profiles to see which profiles you had)
 
 If you also want to clear the conda package cache (to free disk space):
 
-    ~/bin/launch-devbox.sh exec conda clean -afy
+    launch-devbox.sh exec conda clean -afy
 
 To do a full reset of everything devbox-related (environments, settings,
 caches — but NOT your API keys):
 
     rm -rf ~/.devbox/conda ~/.devbox/pip ~/.devbox/npm-global ~/.devbox/R/library
-    ~/bin/launch-devbox.sh setup
+    launch-devbox.sh setup
 
 ### Isolation from host
 
@@ -536,8 +543,8 @@ conflicts and ensures reproducibility.
 
 ### Getting help
 
-    ~/bin/launch-devbox.sh          # Shows all commands and options
-    ~/bin/launch-devbox.sh --help   # Same thing
+    launch-devbox.sh          # Shows all commands and options
+    launch-devbox.sh --help   # Same thing
 
 ---
 
