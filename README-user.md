@@ -54,14 +54,20 @@ This does two things:
 
 ### Step 4: Get a compute node
 
-    qrsh -l h_data=16G,h_rt=4:00:00 -pe shared 4
+    qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
 
 This requests an interactive session on a **compute node** — a machine
 dedicated to your work. The flags mean:
 
-- `h_data=16G` — 16 GB of memory per core
-- `h_rt=4:00:00` — up to 4 hours of wall time
+- `h_data=8G` — 8 GB of memory per core (32 GB total with 4 cores)
+- `h_rt=8:00:00` — up to 8 hours of **wall time**
 - `-pe shared 4` — 4 CPU cores
+
+**Wall time** is the real-world clock time your session is allowed to run.
+After 8 hours, the scheduler kills your session — whether you're done or
+not. It's called "wall time" because it's the time elapsed on a wall clock
+(as opposed to CPU time, which only counts when the processor is actively
+working).
 
 You'll wait briefly in the queue, then your prompt will change to show the
 compute node's name (e.g., `n7234`). **Note this name** — you'll need it
@@ -259,7 +265,7 @@ terminal session that lives on the server.
     ssh hoffman2
 
     # Get a compute node
-    qrsh -l h_data=16G,h_rt=8:00:00 -pe shared 4
+    qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
 
     # Start a tmux session on the compute node
     tmux new -s devbox
@@ -441,7 +447,7 @@ OpenAI's Codex CLI is another AI coding agent.
 ## GPU access
 
     # Request a GPU node interactively
-    qrsh -l gpu,V100,h_data=16G,h_rt=4:00:00 -pe shared 4
+    qrsh -l gpu,V100,h_data=8G,h_rt=8:00:00 -pe shared 4
 
     # Or let the script handle it
     GPU_TYPE=V100 launch-devbox.sh gpu-job
