@@ -79,15 +79,28 @@ launch-devbox.sh codex          # OpenAI Codex AI assistant
 launch-devbox.sh gpu-job        # Request a GPU node
 ```
 
-Install packages anytime — no container rebuild:
+Install packages anytime from inside a devbox shell — no container rebuild needed:
 
 ```bash
-mamba install -n devbox -c conda-forge r-qs2       # conda
-mamba install -n devbox -c bioconda bioconductor-deseq2  # bioconda
-pip install some-package                            # PyPI
-Rscript -e 'install.packages("qs2")'               # CRAN
-npm install -g some-tool                            # npm
+# Conda / Mamba (recommended for most things)
+mamba install -n devbox -c conda-forge <package>
+mamba install -n devbox -c bioconda <package>
+
+# Python (PyPI) — use when a package isn't available via conda
+pip install <package>
+
+# R (CRAN)
+Rscript -e 'install.packages("qs2")'
+
+# R (Bioconductor)
+Rscript -e 'BiocManager::install("DESeq2")'
+
+# Node.js
+npm install -g <package>
 ```
+
+Need a system library that conda can't provide? Open a pull request to
+add it to `devbox-gpu.def` — the admin will rebuild and deploy for everyone.
 
 Create project-specific environments:
 
@@ -120,11 +133,17 @@ README-architecture.md  # Architecture and design rationale
 
 ## Requirements
 
-- A cluster with Apptainer or Singularity installed
-- A separate Linux machine with root access to build the `.sif` (your
-  workstation, a cloud VM, CI runner, etc.)
-- Hoffman2-specific paths are hardcoded in `launch-devbox.sh` but
-  easy to change for other clusters
+**For users** (running devbox on the cluster):
+- An account on a cluster with Apptainer or Singularity installed
+- A pre-built `.sif` container image (provided by your admin)
+- No root access, special permissions, or extra software needed
+
+**For admins** (building the container):
+- A separate Linux machine with root access (or fakeroot) to build the
+  `.sif` — your workstation, a cloud VM, CI runner, etc. Cluster nodes
+  typically don't allow container builds.
+- Hoffman2-specific paths are hardcoded in `launch-devbox.sh` but easy
+  to change for other clusters
 
 ## Adapting for other clusters
 
