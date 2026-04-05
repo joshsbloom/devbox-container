@@ -34,23 +34,24 @@ container or needing admin help.
 ```
 
 The container handles what needs root. Conda handles what needs flexibility.
-Users get both without either.
 
 ## Quick start
 
 ```bash
-# On Hoffman2 — copy scripts and run first-time setup
+# On Hoffman2 — copy scripts (one-time)
 mkdir -p ~/bin
 cp /u/project/kruglyak/PUBLIC_SHARED/containers/launch-devbox.sh ~/bin/
 cp /u/project/kruglyak/PUBLIC_SHARED/containers/devbox-setup.sh ~/bin/
 chmod +x ~/bin/launch-devbox.sh ~/bin/devbox-setup.sh
 
-# First-time setup (creates conda env, ~15-20 min)
+# Get a compute node
 module load singularity
+qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
+
+# First-time setup (creates conda env, ~15-20 min)
 ~/bin/launch-devbox.sh setup
 
-# Get a compute node and start working
-qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
+# Start working
 ~/bin/launch-devbox.sh shell
 ```
 

@@ -27,12 +27,11 @@ on your home directory and persist across sessions.
     echo 'module load singularity' >> ~/.bashrc
     source ~/.bashrc
 
-    # 4. Run first-time setup (creates your conda environment, ~15-20 min)
-    #    Must be run on a login node (needs internet to download packages)
-    ~/bin/launch-devbox.sh setup
-
-    # 5. Get onto a compute node
+    # 4. Get onto a compute node
     qrsh -l h_data=16G,h_rt=4:00:00 -pe shared 4
+
+    # 5. Run first-time setup (creates your conda environment, ~15-20 min)
+    ~/bin/launch-devbox.sh setup
 
     # 6. Start working
     ~/bin/launch-devbox.sh shell
@@ -282,9 +281,7 @@ To set a persistent password instead of a random one:
 
 ## Claude Code
 
-Claude Code is an AI coding assistant that runs in your terminal. It
-requires internet access, so it works best from a **login node** (compute
-nodes on Hoffman2 typically do not have outbound internet).
+Claude Code is an AI coding assistant that runs in your terminal.
 
 ### Authentication
 
@@ -292,7 +289,6 @@ Claude Code supports two auth methods:
 
 **Option A: Subscription (Claude Pro/Max) — recommended**
 
-    # On a login node (has internet)
     ~/bin/launch-devbox.sh shell
 
     # Inside the container
@@ -327,14 +323,12 @@ After first-time auth (either method), Claude Code caches credentials in
 
 ## Codex CLI
 
-OpenAI's Codex CLI is another AI coding agent. Like Claude Code, it
-requires internet access.
+OpenAI's Codex CLI is another AI coding agent.
 
 ### Authentication
 
 **Option A: ChatGPT subscription (Plus/Pro/Team)**
 
-    # On a login node
     ~/bin/launch-devbox.sh shell
 
     # Inside the container
@@ -361,18 +355,6 @@ requires internet access.
 ---
 
 ## Important notes
-
-### Internet access
-
-Hoffman2 compute nodes generally do NOT have outbound internet. This means:
-
-- **Works on compute nodes:** code-server, RStudio, JupyterLab, R, Python,
-  Snakemake — anything that doesn't need to call an external API
-- **Needs login node:** Claude Code, Codex CLI, `pip install` from PyPI,
-  `mamba install` from conda-forge, `install.packages()` from CRAN
-
-To install packages, do it from a login node first, then switch to a
-compute node for your actual work.
 
 ### First-time slowness
 

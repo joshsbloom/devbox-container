@@ -221,8 +221,8 @@ and install everything directly. But the container is still useful for:
 - **Multi-user.** Multiple users on one VM, each with isolated envs.
 - **Quick setup.** Copy the `.sif`, run setup, done.
 
-The main difference: cloud VMs have internet, so Claude Code and Codex
-work anywhere, and you can install packages from any node.
+The main difference: cloud VMs have root access, so the container is
+optional rather than required.
 
 ### Docker / Kubernetes
 
