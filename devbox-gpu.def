@@ -2,7 +2,7 @@ Bootstrap: docker
 From: nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
 %labels
-    Author Josh Bloom
+    Author Joshua S. Bloom
     Description Minimal GPU dev container — system libs + miniforge + code-server + RStudio Server
 
 %environment
