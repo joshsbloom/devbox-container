@@ -1,0 +1,108 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+%labels
+    Author Josh Bloom
+    Description Minimal GPU dev container — system libs + miniforge + code-server + RStudio Server
+
+%environment
+    export PATH=/opt/miniforge3/bin:/opt/code-server/bin:$PATH
+    export NVIDIA_VISIBLE_DEVICES=all
+    export NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    export CUDA_HOME=/usr/local/cuda
+    export PATH=/usr/local/cuda/bin:$PATH
+    export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+%post
+    export PATH=/opt/miniforge3/bin:/opt/code-server/bin:/usr/local/cuda/bin:$PATH
+    export DEBIAN_FRONTEND=noninteractive
+
+    # ── System libraries + build toolchain ───────────────────────────────
+    apt-get update && apt-get install -y --no-install-recommends \
+        curl wget git vim tmux htop ripgrep tree less file procps lsof \
+        build-essential gfortran cmake pkg-config autoconf automake libtool \
+        ca-certificates locales openssh-client jq unzip graphviz \
+        libcurl4-openssl-dev libssl-dev libxml2-dev \
+        libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
+        libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
+        libcairo2-dev libxt-dev libgit2-dev libssh2-1-dev \
+        libhdf5-dev libffi-dev libbz2-dev liblzma-dev \
+        libreadline-dev libsqlite3-dev \
+        libgsl-dev libgmp-dev libmpfr-dev libmagick++-dev \
+        libgdal-dev libproj-dev libgeos-dev libgeos++-dev libudunits2-dev \
+        libv8-dev libsodium-dev libglpk-dev \
+        libboost-all-dev libprotobuf-dev protobuf-compiler \
+        libzmq3-dev libopenblas-dev libnlopt-dev libfftw3-dev \
+        libpoppler-cpp-dev libtesseract-dev libleptonica-dev \
+        libarchive-dev libmysqlclient-dev libpq-dev \
+        gdebi-core psmisc sudo libclang-dev lsb-release \
+        && rm -rf /var/lib/apt/lists/*
+
+    locale-gen en_US.UTF-8
+
+    # ── Miniforge (conda + mamba) ────────────────────────────────────────
+    curl -fL -o /tmp/miniforge.sh \
+        https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+    bash /tmp/miniforge.sh -b -p /opt/miniforge3
+    rm /tmp/miniforge.sh
+    conda clean -afy
+
+    # ── code-server ──────────────────────────────────────────────────────
+    CODE_SERVER_VERSION="4.113.0"
+    mkdir -p /opt/code-server
+    curl -fL "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server-${CODE_SERVER_VERSION}-linux-amd64.tar.gz" \
+        | tar -C /opt/code-server --strip-components=1 -xz
+
+    # ── RStudio Server ───────────────────────────────────────────────────
+    curl -fL -o /tmp/rstudio-server.deb \
+        "https://download2.rstudio.org/server/jammy/amd64/rstudio-server-2026.01.2-418-amd64.deb"
+    gdebi -n /tmp/rstudio-server.deb
+    rm /tmp/rstudio-server.deb
+
+    cat > /usr/lib/rstudio-server/bin/rstudio_auth <<'AUTHEOF'
+#!/usr/bin/env bash
+read -s password
+if [ "$password" == "$RSTUDIO_PASSWORD" ]; then
+    exit 0
+else
+    exit 1
+fi
+AUTHEOF
+    chmod +x /usr/lib/rstudio-server/bin/rstudio_auth
+
+    mkdir -p /etc/rstudio
+    printf 'provider=sqlite\ndirectory=/var/lib/rstudio-server\n' > /etc/rstudio/database.conf
+    printf 'session-timeout-minutes=0\n' > /etc/rstudio/rsession.conf
+
+    # ── Verify ───────────────────────────────────────────────────────────
+    echo "=== Base container built ==="
+    conda --version
+    mamba --version
+    /opt/code-server/bin/code-server --version
+    rstudio-server version || true
+    echo "==========================="
+
+%runscript
+    exec "$@"
+
+%help
+    Minimal GPU dev container for HPC clusters (Hoffman2).
+
+    What's INSIDE the container (read-only, needs root to change):
+      - Ubuntu 22.04 + CUDA 12.4 runtime
+      - System libraries and C/C++/Fortran build toolchain
+      - Miniforge (conda + mamba)
+      - code-server (VS Code in browser)
+      - RStudio Server
+
+    What's OUTSIDE the container (user-managed via conda):
+      - R, Python, Node.js, and all packages
+      - Claude Code, Codex CLI
+      - Snakemake, Jupyter, etc.
+
+    First-time setup:
+      ./launch-devbox.sh setup
+
+    This creates a conda environment at ~/.devbox/conda/envs/devbox
+    with R, Python, Node.js, and common packages. You can customize
+    it freely with conda/mamba/pip/install.packages() — no rebuild needed.
