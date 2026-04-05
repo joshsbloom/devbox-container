@@ -32,14 +32,17 @@ https://www.hoffman2.idre.ucla.edu/SBO/devel/About/FAQ/FAQ.html#set-up-ssh-publi
 
 ### Step 2: Get the scripts (one-time)
 
+Copy and paste this entire block into your terminal:
+
     git clone https://github.com/joshsbloom/devbox-container.git ~/Local/devbox-container
     chmod +x ~/Local/devbox-container/launch-devbox.sh ~/Local/devbox-container/devbox-setup.sh
     mkdir -p ~/Local/bin
     ln -sf ~/Local/devbox-container/launch-devbox.sh ~/Local/bin/launch-devbox.sh
     ln -sf ~/Local/devbox-container/devbox-setup.sh ~/Local/bin/devbox-setup.sh
 
-This clones the devbox repository into `~/Local/devbox-container` and
-creates symlinks in `~/Local/bin` so the scripts are easy to run.
+This downloads the devbox scripts and creates shortcuts (`symlinks`) in
+`~/Local/bin` so you can run them from anywhere. The `mkdir -p` creates
+the directories if they don't already exist.
 
 ### Step 3: Set up your shell (one-time)
 
@@ -93,19 +96,30 @@ SSH tunneling.
 
     launch-devbox.sh setup
 
-This creates your personal conda environment with R, Python, Node.js, and
-core packages. It takes about 15-20 minutes on the first run. You'll see
-progress as packages are downloaded and installed.
+This creates your personal software environment (called a "conda
+environment") with R, Python, Node.js, and core packages. It takes about
+15-20 minutes on the first run. You only need to do this once — your
+environment persists across sessions.
 
 ### Step 6: Start working
 
-    launch-devbox.sh shell
+Pick the interface that suits your workflow:
 
-You're now inside the devbox container with R, Python, and all your tools
-available. Your prompt will show `(devbox)` to indicate you're in the
-container environment.
+    launch-devbox.sh rstudio        # RStudio (port 8787)
+    launch-devbox.sh jupyter        # JupyterLab (port 8888)
+    launch-devbox.sh code-server    # VS Code (port 8080)
+    launch-devbox.sh shell          # Interactive terminal
 
-To exit the container, type `exit` or press `Ctrl-d`.
+RStudio, JupyterLab, and VS Code all run as servers on the compute node
+but you access them **in your regular web browser on your laptop** (Chrome,
+Firefox, etc.) — no extra software to install. You just need to set up an
+SSH tunnel so your browser can reach the compute node. Each command prints
+the tunnel command to run — see
+[SSH tunneling](#ssh-tunneling-for-browser-based-tools) below.
+
+**Your daily workflow** going forward is just Steps 1, 4, and 6: SSH in,
+get a compute node, and launch your service. Steps 2, 3, and 5 only happen
+once.
 
 **Next step:** Read the [Hoffman2 best practices guide](README-hoffman2.md)
 to understand the filesystem layout and how to manage storage — especially
@@ -118,10 +132,10 @@ important to avoid filling your home directory quota.
 Once setup is complete, these are the commands you'll use day-to-day.
 All commands are run **on a compute node** (after `qrsh`):
 
-    launch-devbox.sh shell          # Interactive shell
-    launch-devbox.sh code-server    # VS Code in browser (port 8080)
     launch-devbox.sh rstudio        # RStudio in browser (port 8787)
     launch-devbox.sh jupyter        # JupyterLab in browser (port 8888)
+    launch-devbox.sh code-server    # VS Code in browser (port 8080)
+    launch-devbox.sh shell          # Interactive shell
     launch-devbox.sh claude         # Claude Code CLI
     launch-devbox.sh codex          # OpenAI Codex CLI
     launch-devbox.sh gpu-job        # Request a GPU node, then launch shell
@@ -138,7 +152,8 @@ The base setup gives you R, Python, Node.js, core data science packages
 (Claude Code, Codex).
 
 For domain-specific packages, install **profiles**. Profiles are additive —
-you can add them at any time without reinstalling anything:
+each one adds packages on top of what you already have. You can install
+them at any time without affecting your existing packages:
 
     launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor, snakemake
     launch-devbox.sh setup --with ml         # PyTorch with CUDA support
@@ -191,20 +206,21 @@ directly on Hoffman2 outside the container.
 ## SSH tunneling (for browser-based tools)
 
 VS Code, RStudio, and JupyterLab run as web servers on a compute node.
-Your laptop can't connect to compute nodes directly — it has to go through
-the login node. An SSH tunnel creates this connection.
+Your laptop can't connect to compute nodes directly — they're behind a
+firewall and only reachable from Hoffman2's login node. An **SSH tunnel**
+is a way to tell SSH: "forward traffic from a port on my laptop to a port
+on the compute node, going through the login node." This lets your browser
+talk to the service as if it were running locally.
 
-### The idea
+### How it works
 
-    Your laptop  →  Hoffman2 login node  →  Compute node (n7234)
-    localhost:8080    (passthrough)          code-server listening here
-
-You tell SSH: "when I visit `localhost:8080` on my laptop, forward that
-to port `8080` on compute node `n7234`, going through Hoffman2."
+    Your laptop            Hoffman2 login node        Compute node (n7234)
+    browser → localhost:8080  → SSH forwards →  code-server listening on 8080
 
 ### Step by step
 
-**1. Start the service on the compute node** (in your existing SSH session):
+**1. Start the service on the compute node** (in the terminal where you
+ran `qrsh` earlier):
 
     launch-devbox.sh code-server
 
@@ -214,12 +230,15 @@ The script prints the exact tunnel command you need — just copy it:
     SSH tunnel:   ssh -L 8080:n7234:8080 <user>@hoffman2.idre.ucla.edu
     Open:         http://localhost:8080
 
-**2. Open a NEW terminal on your laptop** and run the tunnel command:
+**2. Open a NEW terminal on your laptop** (not on Hoffman2 — on your
+actual laptop) and run the tunnel command:
 
     ssh -L 8080:n7234:8080 <user>@hoffman2.idre.ucla.edu
 
 Replace `n7234` with whatever the script printed. This terminal must stay
-open as long as you want to use the service — it's holding the tunnel open.
+open as long as you want to use the service — closing it shuts down the
+tunnel. You don't need to type anything in this terminal after connecting;
+just leave it open.
 
 **3. Open your browser** and go to `http://localhost:8080`.
 
@@ -234,7 +253,8 @@ through the login node to the compute node, and code-server responds.
 | RStudio      | 8787        | http://localhost:8787     |
 | JupyterLab   | 8888        | http://localhost:8888     |
 
-If a port is in use (another user on the same node), change it:
+If a port is already in use (another user on the same compute node, or
+you're running multiple services), change it:
 
     CODE_SERVER_PORT=8081 launch-devbox.sh code-server
     RSTUDIO_PORT=8788 launch-devbox.sh rstudio
@@ -292,11 +312,15 @@ terminal session that lives on the server.
     # Now launch your service inside tmux
     launch-devbox.sh code-server
 
-If your SSH drops, reconnect and reattach:
+If your SSH drops (laptop closes, Wi-Fi blips), your services keep running
+inside tmux. To get back to them:
 
     ssh hoffman2
-    ssh n7234              # SSH directly to the same compute node
+    ssh n7234              # SSH directly to the same compute node you were on
     tmux attach -t devbox  # reattach — everything is still running
+
+You'll also need to re-establish your SSH tunnel from your laptop (step 2
+from the tunneling section above).
 
 ### Running multiple services
 
@@ -333,36 +357,6 @@ it) would still die if the connection drops.
 
 ---
 
-## VS Code (code-server)
-
-    # On compute node
-    launch-devbox.sh code-server
-
-    # Tunnel from laptop (in a new terminal)
-    ssh -L 8080:<node>:8080 hoffman2
-
-    # Open http://localhost:8080
-    # Password is in ~/.config/code-server/config.yaml
-
-code-server gives you the full VS Code experience in your browser. You can
-install VS Code extensions, use the integrated terminal, and edit files
-across your home, scratch, and project directories.
-
-The launch script automatically configures code-server so that:
-- The integrated terminal uses the devbox environment (R, Python, conda)
-- The R extension points to the correct R binary
-- The Python extension points to the correct Python interpreter
-
-**Useful extensions to install** (from the code-server Extensions panel):
-- R (REditorSupport.r) — R language support, linting, plot viewer
-- Python (ms-python.python) — Python language support
-- Jupyter — notebook support
-
-**Note:** The R extension will auto-install `languageserver` — this is
-already included in the devbox environment, so it should work immediately.
-
----
-
 ## RStudio Server
 
     # On compute node
@@ -385,6 +379,51 @@ packages installed via `install.packages()`, `BiocManager::install()`, or
 To set a persistent password instead of a random one:
 
     RSTUDIO_PASSWORD=mypassword launch-devbox.sh rstudio
+
+---
+
+## JupyterLab
+
+    # On compute node
+    launch-devbox.sh jupyter
+
+    # Tunnel from laptop (in a new terminal)
+    ssh -L 8888:<node>:8888 hoffman2
+
+    # Open http://localhost:8888
+
+JupyterLab starts with both Python and R kernels available. The token
+for authentication is printed in the terminal output when the server starts.
+
+---
+
+## VS Code (code-server)
+
+    # On compute node
+    launch-devbox.sh code-server
+
+    # Tunnel from laptop (in a new terminal)
+    ssh -L 8080:<node>:8080 hoffman2
+
+    # Open http://localhost:8080
+    # Password is printed in the terminal when code-server starts
+
+code-server gives you the full VS Code experience in your browser. You can
+install VS Code extensions, use the integrated terminal, and edit files
+across your home, scratch, and project directories.
+
+The launch script automatically configures code-server so that:
+- The integrated terminal uses the devbox environment (R, Python, conda)
+- The R extension points to the correct R binary
+- The Python extension points to the correct Python interpreter
+
+**Useful extensions to install** (from the code-server Extensions panel):
+- R (REditorSupport.r) — R language support, linting, plot viewer
+- Python (ms-python.python) — Python language support
+- Jupyter — notebook support
+
+**Note:** The R extension will auto-install `languageserver` — this is
+already included in the devbox environment, so it should work immediately.
 
 ---
 
@@ -488,13 +527,14 @@ availability with the Hoffman2 documentation).
 
 ### Using a different conda environment
 
-The default environment is called `devbox`. You can create additional
-environments for specific projects:
+The default environment is called `devbox`. If you need a different set of
+packages for a specific project (e.g., a different Python version), you can
+create a separate environment without affecting your main one:
 
     # Inside a devbox shell
     mamba create -n myproject python=3.11 pandas scikit-learn
 
-    # Launch a shell using that environment
+    # Launch a shell using that environment instead of the default
     DEVBOX_ENV=myproject launch-devbox.sh shell
 
 Custom environments are stored alongside `devbox` in `~/.devbox/conda/envs/`
@@ -511,8 +551,8 @@ shell session and is never overwritten by the launch script.
 
 ### Verbose mode
 
-To see the underlying Singularity/Apptainer commands that devbox runs
-(useful for learning or debugging):
+To see the exact Singularity/Apptainer commands that devbox runs under
+the hood (useful for learning how containers work, or for debugging):
 
     launch-devbox.sh --verbose shell
 
@@ -522,13 +562,15 @@ To see the underlying Singularity/Apptainer commands that devbox runs
 
 ### First-time slowness
 
-The first time you run the container, Singularity/Apptainer may convert the
-`.sif` file to a temporary sandbox. This can take a few minutes. To speed
-this up, add these to your `~/.bashrc`:
+The very first time you run the container, Singularity may take a few
+minutes to convert the `.sif` file. This only happens once. To speed it up
+and avoid filling your home directory, add these to your `~/.bashrc`:
 
     export SINGULARITY_TMPDIR=/u/scratch/$USER/singularity-tmp
     export SINGULARITY_CACHEDIR=/u/scratch/$USER/singularity-cache
     mkdir -p $SINGULARITY_TMPDIR $SINGULARITY_CACHEDIR
+
+Then run `source ~/.bashrc` to apply.
 
 ### Resetting your conda environment
 
@@ -560,12 +602,14 @@ caches — but NOT your API keys):
     rm -rf ~/.devbox/conda ~/.devbox/pip ~/.devbox/npm-global ~/.devbox/R/library
     launch-devbox.sh setup
 
-### Isolation from host
+### "I installed a package but it's not showing up"
 
-The container is fully isolated from Hoffman2's native R/Python. Packages
-installed via `module load R` on the host will NOT be visible inside the
-container, and vice versa. This is intentional — it prevents version
-conflicts and ensures reproducibility.
+The devbox container is isolated from Hoffman2's native R/Python. If you
+previously installed packages using `module load R` or `module load python`
+on Hoffman2 (outside of devbox), those packages are NOT visible inside the
+container. This is intentional — it prevents version conflicts. You need
+to reinstall packages inside the devbox environment using the commands in
+the [Installing packages](#installing-packages) section.
 
 ### Getting help
 
