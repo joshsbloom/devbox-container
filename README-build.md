@@ -88,17 +88,28 @@ proxy settings.
 
 ## Deploying to Hoffman2
 
+### Container image
+
+The `.sif` file must be copied to the shared project directory:
+
     # Transfer the .sif file (3-5 GB, may take a while)
     scp devbox-gpu.sif <user>@hoffman2.idre.ucla.edu:/u/project/kruglyak/PUBLIC_SHARED/containers/
 
-    # Transfer the scripts
-    scp launch-devbox.sh devbox-setup.sh <user>@hoffman2.idre.ucla.edu:/u/project/kruglyak/PUBLIC_SHARED/containers/
-
-    # Set permissions so all group members can use them
+    # Set permissions so all group members can read it
     ssh <user>@hoffman2.idre.ucla.edu
     chmod 755 /u/project/kruglyak/PUBLIC_SHARED/containers/devbox-gpu.sif
-    chmod 755 /u/project/kruglyak/PUBLIC_SHARED/containers/launch-devbox.sh
-    chmod 755 /u/project/kruglyak/PUBLIC_SHARED/containers/devbox-setup.sh
+
+### Scripts
+
+Users get the scripts by cloning the repository themselves (see the
+[User Guide](README-user.md)). This means script updates are distributed
+via `git pull` — no need for admins to copy files around. Each user runs:
+
+    git clone https://github.com/joshsbloom/devbox-container.git ~/Local/devbox-container
+
+To pick up script updates later:
+
+    cd ~/Local/devbox-container && git pull
 
 ## Updating the container
 
