@@ -549,6 +549,25 @@ shell session and is never overwritten by the launch script.
 
     vim ~/.devbox/bashrc_user
 
+### Using your dotfiles (vimrc, zshrc, etc.)
+
+Your home directory is mounted into the container, so config files like
+`~/.vimrc`, `~/.gitconfig`, and `~/.tmux.conf` work automatically — no
+extra setup needed.
+
+**Using zsh:** zsh is not included in the container by default, but you
+can install it via conda:
+
+    mamba install -n devbox -c conda-forge zsh
+
+Then add this to `~/.devbox/bashrc_user` to switch to zsh automatically:
+
+    exec zsh
+
+Your `~/.zshrc` will be picked up as usual. If you use a framework like
+Oh My Zsh, install it into your home directory and it will persist across
+sessions.
+
 ### Verbose mode
 
 To see the exact Singularity/Apptainer commands that devbox runs under
