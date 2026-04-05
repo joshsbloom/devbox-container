@@ -264,6 +264,29 @@ feedback loop is painfully slow. The thin-base approach means:
 - Users are self-service for packages
 - Different users can have different R/Python versions if needed
 
+### Why do Claude Code and Codex need the container?
+
+Even with conda providing Node.js, `npm install -g @anthropic-ai/claude-code`
+and `npm install -g @openai/codex` fail on the bare Hoffman2 host. These
+packages ship prebuilt native binaries (via `node-gyp` or bundled `.node`
+addons) that are compiled against glibc 2.28+ and link to modern system
+libraries like `libstdc++` and `libssl`. Conda's Node.js itself runs fine
+because conda ships its own glibc, but npm postinstall scripts download or
+compile native code that dynamically links against the *system* glibc
+(`/lib64/libc.so.6`), not conda's. On CentOS 7 (glibc 2.17), this produces
+errors like:
+
+    /lib64/libc.so.6: version `GLIBC_2.25' not found
+    /lib64/libc.so.6: version `GLIBC_2.28' not found
+
+There's no way to fix this without replacing the system's glibc, which
+requires root. Running the install inside the Apptainer container sidesteps
+the problem entirely — the container provides Ubuntu 22.04 with glibc 2.35,
+so the native binaries find everything they need. The installed binaries
+land in `~/.devbox/npm-global/bin/` (on the host filesystem via bind mount),
+and at runtime they work because `launch-devbox.sh` always runs them inside
+the container where the modern glibc is available.
+
 ### Why MKL instead of OpenBLAS?
 
 MKL is generally faster for the linear algebra workloads common in
