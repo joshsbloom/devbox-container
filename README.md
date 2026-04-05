@@ -41,6 +41,7 @@ ssh <user>@hoffman2.idre.ucla.edu
 
 # 2. Get the scripts (one-time)
 git clone https://github.com/joshsbloom/devbox-container.git ~/Local/devbox-container
+chmod +x ~/Local/devbox-container/launch-devbox.sh ~/Local/devbox-container/devbox-setup.sh
 mkdir -p ~/Local/bin
 ln -sf ~/Local/devbox-container/launch-devbox.sh ~/Local/bin/launch-devbox.sh
 ln -sf ~/Local/devbox-container/devbox-setup.sh ~/Local/bin/devbox-setup.sh
