@@ -139,9 +139,12 @@ You can also install profiles during the initial setup:
 
     launch-devbox.sh setup --with all
 
-To start over with a clean environment:
+To start over with a clean environment (run from a compute node):
 
-    mamba env remove -p ~/.devbox/conda/envs/devbox
+    # Remove the existing environment (runs mamba inside the container)
+    launch-devbox.sh exec mamba env remove -p ~/.devbox/conda/envs/devbox -y
+
+    # Recreate with whichever profiles you want
     launch-devbox.sh setup --with bioinfo,ml
 
 ---
