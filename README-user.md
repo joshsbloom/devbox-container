@@ -201,6 +201,14 @@ All installed packages are stored in `~/.devbox/` and persist across sessions.
 They are isolated from any R/Python/Node packages you may have installed
 directly on Hoffman2 outside the container.
 
+**Need a system library?** You can't run `apt install` inside the container
+— it's read-only. Most libraries are available through conda instead
+(`mamba install -n devbox -c conda-forge <library>`). If you need something
+that truly requires a system-level install, open a pull request to add it
+to `devbox-gpu.def` in the
+[GitHub repo](https://github.com/joshsbloom/devbox-container) — the admin
+will review, rebuild the container, and deploy it for everyone.
+
 ---
 
 ## SSH tunneling (for browser-based tools)
