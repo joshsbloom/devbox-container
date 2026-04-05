@@ -497,14 +497,34 @@ this up, add these to your `~/.bashrc`:
     export SINGULARITY_CACHEDIR=/u/scratch/$USER/singularity-cache
     mkdir -p $SINGULARITY_TMPDIR $SINGULARITY_CACHEDIR
 
-### Rebuilding your environment
+### Resetting your conda environment
 
-If your conda environment gets corrupted or you want a fresh start:
+If packages stop working, you get solver errors, or you just want a clean
+slate, you can remove your conda environment and rebuild it. This does NOT
+affect your files, projects, or API keys — only the installed packages.
 
-    # Remove the old environment
-    mamba env remove -p ~/.devbox/conda/envs/devbox
+Run these from a compute node:
 
-    # Re-run setup
+    # 1. Remove the existing environment
+    ~/bin/launch-devbox.sh exec mamba env remove -p ~/.devbox/conda/envs/devbox -y
+
+    # 2. Recreate it (base packages only)
+    ~/bin/launch-devbox.sh setup
+
+    # 3. Re-add any profiles you had before
+    ~/bin/launch-devbox.sh setup --with bioinfo,ml,r-extra
+
+    # 4. Re-install any extra packages you added manually
+    #    (check ~/.devbox/installed_profiles to see which profiles you had)
+
+If you also want to clear the conda package cache (to free disk space):
+
+    ~/bin/launch-devbox.sh exec conda clean -afy
+
+To do a full reset of everything devbox-related (environments, settings,
+caches — but NOT your API keys):
+
+    rm -rf ~/.devbox/conda ~/.devbox/pip ~/.devbox/npm-global ~/.devbox/R/library
     ~/bin/launch-devbox.sh setup
 
 ### Isolation from host
