@@ -50,7 +50,7 @@ module load singularity
 ~/bin/launch-devbox.sh setup
 
 # Get a compute node and start working
-qrsh -l h_data=16G,h_rt=4:00:00 -pe shared 4
+qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
 ~/bin/launch-devbox.sh shell
 ```
 
