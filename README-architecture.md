@@ -72,26 +72,8 @@ Singularity) was built specifically for HPC:
 
 ## Why conda for packages (instead of baking them into the container)?
 
-Early versions of DevBox baked R, Python, and all packages into the `.sif`.
-This caused several problems:
-
-- **Slow iteration.** Adding one missing library meant rebuilding the
-  entire container on a workstation (30-60 min), transferring 10+ GB
-  to Hoffman2, and testing. Each solver conflict or build error restarted
-  this cycle.
-
-- **One-size-fits-none.** Different users need different packages.
-  Baking a fixed set into the container means either a bloated image
-  with everything, or users unable to add what they need.
-
-- **Version conflicts.** R and Python packages installed inside the
-  container used the container's GCC (from conda-forge), which couldn't
-  find system `-dev` libraries installed via `apt-get`. The two
-  toolchains clashed.
-
-The solution: the container provides only the system libraries and build
-toolchain. All user-facing software lives in a conda environment on the
-host filesystem:
+The container provides only system libraries and the build toolchain.
+All user-facing software lives in a conda environment on the host filesystem:
 
 - **Users install packages themselves.** `mamba install`, `pip install`,
   `install.packages()` — no container rebuild, no admin needed.
@@ -254,15 +236,6 @@ Conda can install its own GCC and most libraries, but:
 
 - The container guarantees a consistent base regardless of what's
   installed on the host.
-
-### Why not bake everything into the container?
-
-As discussed above, this was the original approach. It works but the
-feedback loop is painfully slow. The thin-base approach means:
-
-- Container rebuilds are rare and fast (~10 min, ~3 GB)
-- Users are self-service for packages
-- Different users can have different R/Python versions if needed
 
 ### Why do Claude Code and Codex need the container?
 
