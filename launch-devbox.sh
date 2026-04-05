@@ -263,7 +263,8 @@ case "$MODE" in
     code-server)
         echo "Starting code-server on port $CODE_SERVER_PORT..."
         print_tunnel "$CODE_SERVER_PORT"
-        echo "  Password: ~/.config/code-server/config.yaml"
+        CS_PASSWORD=$(grep -oP '(?<=password: ).*' "$HOME/.config/code-server/config.yaml" 2>/dev/null || echo "(see ~/.config/code-server/config.yaml)")
+        echo "  Password: $CS_PASSWORD"
 
         # Write devbox-managed code-server settings for terminal and
         # language extension integration. User settings in settings.json
