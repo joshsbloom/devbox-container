@@ -125,14 +125,16 @@ set_container_env CHOKIDAR_USEPOLLING 1
 set_container_env TSC_WATCHFILE UseFsEventsWithFallbackDynamicPolling
 
 # Activate the conda env by prepending to the container's default PATH
+CONTAINER_BASE_PATH="/opt/miniforge3/bin:/opt/code-server/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 if [[ -d "$ENV_PATH/bin" ]]; then
     DEVBOX_PATH="$ENV_PATH/bin:$DEVBOX_HOME/npm-global/bin"
-    CONTAINER_BASE_PATH="/opt/miniforge3/bin:/opt/code-server/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     FULL_PATH="${DEVBOX_PATH}:${CONTAINER_BASE_PATH}"
     export SINGULARITYENV_PATH="$FULL_PATH"
     export APPTAINERENV_PATH="$FULL_PATH"
     set_container_env CONDA_DEFAULT_ENV "$ENV_NAME"
     set_container_env CONDA_PREFIX "$ENV_PATH"
+else
+    FULL_PATH="$CONTAINER_BASE_PATH"
 fi
 
 [[ "$ENV_NAME" != "devbox" ]] && echo "[devbox] Using conda environment: $ENV_NAME"
