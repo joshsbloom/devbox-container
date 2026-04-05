@@ -58,14 +58,19 @@ The `source ~/.bashrc` applies the changes to your current session.
 
 ### Step 4: Get a compute node
 
-    qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
+    qrsh -l highp,h_rt=8:00:00,h_data=5G,h_vmem=60G -pe shared 12 -now n
 
 This requests an interactive session on a **compute node** — a machine
 dedicated to your work. The flags mean:
 
-- `h_data=8G` — 8 GB of memory per core (32 GB total with 4 cores)
+- `highp` — use the "high priority" queue (available to your group's
+  owned nodes, so jobs start faster)
 - `h_rt=8:00:00` — up to 8 hours of **wall time**
-- `-pe shared 4` — 4 CPU cores
+- `h_data=5G` — 5 GB of physical memory per core (60 GB total with 12 cores)
+- `h_vmem=60G` — 60 GB virtual memory limit for the whole job
+- `-pe shared 12` — 12 CPU cores
+- `-now n` — wait in the queue instead of failing immediately if no
+  nodes are free
 
 **Wall time** is the real-world clock time your session is allowed to run.
 After 8 hours, the scheduler kills your session — whether you're done or
@@ -73,9 +78,16 @@ not. It's called "wall time" because it's the time elapsed on a wall clock
 (as opposed to CPU time, which only counts when the processor is actively
 working).
 
-You'll wait briefly in the queue, then your prompt will change to show the
-compute node's name (e.g., `n7234`). **Note this name** — you'll need it
-later for SSH tunneling.
+**If you're waiting too long in the queue**, reduce resources to get a node
+faster. Try these in order:
+- Fewer cores: `-pe shared 4` instead of 12
+- Less memory: `h_data=4G,h_vmem=20G`
+- Shorter wall time: `h_rt=4:00:00`
+- Drop `highp` (uses the general queue — more nodes but lower priority)
+
+You'll wait in the queue, then your prompt will change to show the compute
+node's name (e.g., `n7234`). **Note this name** — you'll need it later for
+SSH tunneling.
 
 ### Step 5: Run first-time setup
 
@@ -272,7 +284,7 @@ terminal session that lives on the server.
     ssh hoffman2
 
     # Get a compute node
-    qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
+    qrsh -l highp,h_rt=8:00:00,h_data=5G,h_vmem=60G -pe shared 12 -now n
 
     # Start a tmux session on the compute node
     tmux new -s devbox
@@ -454,7 +466,7 @@ OpenAI's Codex CLI is another AI coding agent.
 ## GPU access
 
     # Request a GPU node interactively
-    qrsh -l gpu,V100,h_data=8G,h_rt=8:00:00 -pe shared 4
+    qrsh -l gpu,V100,highp,h_rt=8:00:00,h_data=5G,h_vmem=60G -pe shared 12 -now n
 
     # Or let the script handle it
     GPU_TYPE=V100 launch-devbox.sh gpu-job

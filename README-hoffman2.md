@@ -223,22 +223,27 @@ rule count:
 
 ### Request appropriate resources
 
-Don't request more than you need — it slows down your queue wait time:
+A good default for interactive development:
 
-    # Light work (editing, browsing, small scripts)
-    qrsh -l h_data=4G,h_rt=4:00:00 -pe shared 2
+    qrsh -l highp,h_rt=8:00:00,h_data=5G,h_vmem=60G -pe shared 12 -now n
 
-    # Typical data analysis (R, Python, moderate memory)
-    qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
+What each flag means:
+- `highp` — high-priority queue (your group's owned nodes, faster start)
+- `h_rt=8:00:00` — 8 hours of wall time (real clock time before the job is killed)
+- `h_data=5G` — 5 GB physical memory per core (60 GB total with 12 cores)
+- `h_vmem=60G` — 60 GB virtual memory limit for the whole job
+- `-pe shared 12` — 12 CPU cores
+- `-now n` — wait in the queue instead of failing if no nodes are free
 
-    # Heavy computation (large datasets, many cores)
-    qrsh -l h_data=16G,h_rt=24:00:00 -pe shared 8
+For GPU work, add `gpu,V100` (or another GPU type):
 
-    # GPU work
-    qrsh -l gpu,V100,h_data=16G,h_rt=8:00:00 -pe shared 4
+    qrsh -l gpu,V100,highp,h_rt=8:00:00,h_data=5G,h_vmem=60G -pe shared 12 -now n
 
-Note: `h_data` is memory **per core**. Requesting `-pe shared 4` with
-`h_data=16G` gives you 64 GB total.
+**If you're waiting too long in the queue**, reduce resources. Try in order:
+1. Fewer cores: `-pe shared 4` instead of 12
+2. Less memory: `h_data=4G,h_vmem=20G`
+3. Shorter wall time: `h_rt=4:00:00`
+4. Drop `highp` (uses the general queue — more nodes available but lower priority)
 
 ### Use batch jobs for long-running work
 

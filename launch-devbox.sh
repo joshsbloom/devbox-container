@@ -396,14 +396,15 @@ JPYEOF
         ;;
 
     gpu-job)
-        GPU_TYPE="${GPU_TYPE:-P4}"
-        CORES="${CORES:-4}"
-        MEM="${MEM:-16G}"
-        TIME="${TIME:-4:00:00}"
+        GPU_TYPE="${GPU_TYPE:-V100}"
+        CORES="${CORES:-12}"
+        MEM="${MEM:-5G}"
+        VMEM="${VMEM:-60G}"
+        TIME="${TIME:-8:00:00}"
         echo "Requesting GPU session: $GPU_TYPE, ${CORES} cores, ${MEM}/core, ${TIME}..."
         # SGE syntax — change DEVBOX_GPU_JOB_CMD for other schedulers
-        "$GPU_JOB_CMD" -l "gpu,${GPU_TYPE},h_data=${MEM},h_rt=${TIME}" \
-             -pe "shared" "$CORES" \
+        "$GPU_JOB_CMD" -l "gpu,${GPU_TYPE},highp,h_data=${MEM},h_vmem=${VMEM},h_rt=${TIME}" \
+             -pe "shared" "$CORES" -now n \
              "$0" shell
         ;;
 
@@ -448,10 +449,11 @@ Environment variables:
   RSTUDIO_PORT          RStudio port (default: 8787)
   RSTUDIO_PASSWORD      RStudio password (default: auto-generated)
   JUPYTER_PORT          Jupyter port (default: 8888)
-  GPU_TYPE              GPU type for gpu-job (default: P4)
-  CORES                 CPU cores for gpu-job (default: 4)
-  MEM                   Memory per core for gpu-job (default: 16G)
-  TIME                  Wall time for gpu-job (default: 4:00:00)
+  GPU_TYPE              GPU type for gpu-job (default: V100)
+  CORES                 CPU cores for gpu-job (default: 12)
+  MEM                   Memory per core for gpu-job (default: 5G)
+  VMEM                  Virtual memory limit for gpu-job (default: 60G)
+  TIME                  Wall time for gpu-job (default: 8:00:00)
 USAGE
         exit 1
         ;;

@@ -52,7 +52,7 @@ echo 'module load singularity' >> ~/.bashrc
 source ~/.bashrc
 
 # 4. Get a compute node (setup needs resources — don't run on the login node)
-qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
+qrsh -l highp,h_rt=8:00:00,h_data=5G,h_vmem=60G -pe shared 12 -now n
 
 # 5. First-time setup (creates conda env with base packages)
 launch-devbox.sh setup
