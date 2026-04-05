@@ -2,8 +2,18 @@
 # ──────────────────────────────────────────────────────────────────────────
 # devbox-setup.sh — First-time setup for the devbox container
 #
-# Creates a conda environment with R, Python, Node.js, and common packages.
+# Creates a conda environment with R, Python, Node.js, and core tools.
 # Run this ONCE inside the container (via launch-devbox.sh setup).
+#
+# Optional profiles add domain-specific packages:
+#   launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor
+#   launch-devbox.sh setup --with ml         # PyTorch with CUDA
+#   launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms, etc.
+#   launch-devbox.sh setup --with all        # everything
+#
+# Profiles can also be installed later on an existing environment:
+#   launch-devbox.sh setup --with ml
+#
 # After setup, customize freely:
 #   mamba install -n devbox <package>
 #   pip install <package>
@@ -16,7 +26,23 @@ DEVBOX_HOME="${DEVBOX_HOME:-$HOME/.devbox}"
 ENV_NAME="devbox"
 ENV_PATH="$DEVBOX_HOME/conda/envs/$ENV_NAME"
 
-echo "=== DevBox first-time setup for $(whoami) ==="
+# ── Parse arguments ─────────────────────────────────────────────────────
+PROFILES=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --with)
+            shift
+            IFS=',' read -ra PROFILES <<< "${1:-}"
+            shift
+            ;;
+        *)
+            echo "[setup] Unknown argument: $1"
+            exit 1
+            ;;
+    esac
+done
+
+echo "=== DevBox setup for $(whoami) ==="
 echo ""
 
 # ── Create directory structure ───────────────────────────────────────────
@@ -56,17 +82,110 @@ R_LIBS_USER=$DEVBOX_HOME/R/library
 R_LIBS_SITE=
 RENVEOF
 
-# ── Check if env already exists ──────────────────────────────────────────
-if [[ -d "$ENV_PATH" ]]; then
-    echo "[setup] Conda environment '$ENV_NAME' already exists at $ENV_PATH"
-    echo "        To rebuild: mamba env remove -n $ENV_NAME && ./devbox-setup.sh"
+# ── Profile installation functions ──────────────────────────────────────
+
+install_bioinfo() {
+    echo ""
+    echo "[setup] Installing bioinformatics profile..."
+    mamba install -y -p "$ENV_PATH" -c conda-forge -c bioconda \
+        biopython pysam pybedtools scanpy anndata snakemake
+
+    echo "[setup] Installing Bioconductor packages via conda..."
+    mamba install -y -p "$ENV_PATH" -c conda-forge -c bioconda \
+        bioconductor-genomicranges \
+        bioconductor-biostrings \
+        bioconductor-variantannotation \
+        bioconductor-deseq2 \
+        bioconductor-genomicfeatures \
+        bioconductor-rtracklayer \
+        bioconductor-genomicalignments \
+        bioconductor-edger \
+        bioconductor-limma \
+        bioconductor-complexheatmap \
+        bioconductor-rsamtools \
+        bioconductor-bsgenome
+}
+
+install_ml() {
+    echo ""
+    echo "[setup] Installing machine learning profile..."
+    mamba install -y -p "$ENV_PATH" -c pytorch -c nvidia -c conda-forge \
+        pytorch \
+        torchvision \
+        pytorch-cuda=12.4
+}
+
+install_r_extra() {
+    echo ""
+    echo "[setup] Installing extended R profile..."
+    mamba install -y -p "$ENV_PATH" -c conda-forge \
+        r-devtools r-tidyverse r-data.table \
+        r-rmarkdown r-knitr r-shiny r-reticulate \
+        r-renv r-biocmanager r-remotes r-dt \
+        r-hdf5r r-rcpp r-rcpparmadillo r-rcppeigen \
+        r-matrix r-lme4 r-brms \
+        r-ggrepel r-patchwork r-pheatmap r-viridis r-corrplot \
+        r-future r-future.apply r-furrr r-arrow
+}
+
+# ── Tracking file for installed profiles ─────────────────────────────────
+PROFILES_FILE="$DEVBOX_HOME/installed_profiles"
+touch "$PROFILES_FILE"
+
+mark_profile() {
+    if ! grep -qx "$1" "$PROFILES_FILE" 2>/dev/null; then
+        echo "$1" >> "$PROFILES_FILE"
+    fi
+}
+
+is_profile_installed() {
+    grep -qx "$1" "$PROFILES_FILE" 2>/dev/null
+}
+
+# ── Install profiles on existing env ────────────────────────────────────
+if [[ -d "$ENV_PATH" ]] && [[ ${#PROFILES[@]} -gt 0 ]]; then
+    echo "[setup] Conda environment '$ENV_NAME' exists. Installing additional profiles..."
+    export PATH="$ENV_PATH/bin:$PATH"
+
+    for profile in "${PROFILES[@]}"; do
+        case "$profile" in
+            all)
+                install_bioinfo && mark_profile bioinfo
+                install_ml && mark_profile ml
+                install_r_extra && mark_profile r-extra
+                ;;
+            bioinfo)  install_bioinfo && mark_profile bioinfo ;;
+            ml)       install_ml && mark_profile ml ;;
+            r-extra)  install_r_extra && mark_profile r-extra ;;
+            *)
+                echo "[setup] Unknown profile: $profile (available: bioinfo, ml, r-extra, all)"
+                exit 1
+                ;;
+        esac
+    done
+
+    conda clean -afy
+    echo ""
+    echo "=== Profiles installed! ==="
     exit 0
 fi
 
-# ── Create conda environment ────────────────────────────────────────────
+# ── If env exists and no profiles requested, nothing to do ───────────────
+if [[ -d "$ENV_PATH" ]] && [[ ${#PROFILES[@]} -eq 0 ]]; then
+    echo "[setup] Conda environment '$ENV_NAME' already exists at $ENV_PATH"
+    echo ""
+    echo "  To add packages:    mamba install -n $ENV_NAME <package>"
+    echo "  To add profiles:    launch-devbox.sh setup --with bioinfo,ml,r-extra"
+    echo "  To rebuild from scratch:"
+    echo "    mamba env remove -p $ENV_PATH"
+    echo "    launch-devbox.sh setup"
+    exit 0
+fi
+
+# ── Create conda environment (base) ────────────────────────────────────
 echo ""
 echo "[setup] Creating conda environment '$ENV_NAME'..."
-echo "        This will take 10-20 minutes on first run."
+echo "        This will take a few minutes."
 echo ""
 
 # Core: Python + R + Node.js + MKL as BLAS/LAPACK backend
@@ -80,11 +199,8 @@ mamba create -y -p "$ENV_PATH" -c conda-forge \
     "liblapack=*=*mkl" \
     mkl-devel
 
-echo "[setup] Installing Python packages..."
-mamba install -y -p "$ENV_PATH" -c pytorch -c nvidia -c conda-forge \
-    pytorch \
-    torchvision \
-    pytorch-cuda=12.4 \
+echo "[setup] Installing core Python packages..."
+mamba install -y -p "$ENV_PATH" -c conda-forge \
     numpy scipy pandas polars scikit-learn statsmodels \
     matplotlib seaborn plotnine plotly \
     jupyterlab ipykernel ipywidgets notebook \
@@ -92,20 +208,9 @@ mamba install -y -p "$ENV_PATH" -c pytorch -c nvidia -c conda-forge \
     black ruff mypy pytest pre-commit \
     httpx tqdm pyyaml click rich
 
-echo "[setup] Installing bioinformatics packages..."
-mamba install -y -p "$ENV_PATH" -c conda-forge -c bioconda \
-    biopython pysam pybedtools scanpy anndata snakemake
-
-echo "[setup] Installing R packages..."
+echo "[setup] Installing core R packages..."
 mamba install -y -p "$ENV_PATH" -c conda-forge \
-    r-devtools r-tidyverse r-data.table \
-    r-rmarkdown r-knitr r-shiny r-reticulate \
-    r-irkernel r-renv r-biocmanager r-remotes r-dt \
-    r-hdf5r r-rcpp r-rcpparmadillo r-rcppeigen \
-    r-matrix r-lme4 r-brms \
-    r-ggrepel r-patchwork r-pheatmap r-viridis r-corrplot \
-    r-future r-future.apply r-furrr r-arrow \
-    r-languageserver r-httpgd r-rlang
+    r-irkernel r-languageserver r-httpgd r-rlang
 
 # C/C++ libraries needed inside the conda env so that conda's compiler
 # can find them when compiling R packages from source (the system -dev
@@ -115,26 +220,7 @@ mamba install -y -p "$ENV_PATH" -c conda-forge \
     libxml2 libcurl openssl zlib bzip2 xz \
     htslib curl
 
-echo "[setup] Installing Bioconductor packages via conda..."
-# Install as many Bioconductor packages as possible via conda to avoid
-# compilation issues with conda's gcc vs system libraries
-mamba install -y -p "$ENV_PATH" -c conda-forge -c bioconda \
-    bioconductor-genomicranges \
-    bioconductor-biostrings \
-    bioconductor-variantannotation \
-    bioconductor-deseq2 \
-    bioconductor-genomicfeatures \
-    bioconductor-rtracklayer \
-    bioconductor-genomicalignments \
-    bioconductor-edger \
-    bioconductor-limma \
-    bioconductor-complexheatmap \
-    bioconductor-rsamtools \
-    bioconductor-bsgenome
-
 echo "[setup] Installing CLI tools..."
-# Activate env to use its npm and set npm global prefix
-# to match what launch-devbox.sh expects at runtime
 export PATH="$ENV_PATH/bin:$PATH"
 export NPM_CONFIG_PREFIX="$DEVBOX_HOME/npm-global"
 npm install -g @anthropic-ai/claude-code
@@ -161,7 +247,7 @@ fi
 echo ""
 echo "[setup] Claude Code and Codex CLI installed."
 echo "        Authentication is required before first use."
-echo "        Run these on a LOGIN NODE (needs internet):"
+echo "        Run these on a compute node:"
 echo ""
 echo "          ~/bin/launch-devbox.sh claude"
 echo "          ~/bin/launch-devbox.sh codex"
@@ -174,11 +260,23 @@ echo ""
 echo "[setup] Registering R kernel for Jupyter..."
 "$ENV_PATH/bin/Rscript" -e "IRkernel::installspec(user = TRUE)"
 
-echo "[setup] Bioconductor packages installed via conda (above)."
-echo "        To add more Bioconductor packages:"
-echo "          mamba install -n devbox -c bioconda bioconductor-<pkgname>"
-echo "        Or from R:"
-echo "          BiocManager::install('PkgName')"
+# ── Install requested profiles ──────────────────────────────────────────
+for profile in "${PROFILES[@]}"; do
+    case "$profile" in
+        all)
+            install_bioinfo && mark_profile bioinfo
+            install_ml && mark_profile ml
+            install_r_extra && mark_profile r-extra
+            ;;
+        bioinfo)  install_bioinfo && mark_profile bioinfo ;;
+        ml)       install_ml && mark_profile ml ;;
+        r-extra)  install_r_extra && mark_profile r-extra ;;
+        *)
+            echo "[setup] Unknown profile: $profile (available: bioinfo, ml, r-extra, all)"
+            exit 1
+            ;;
+    esac
+done
 
 conda clean -afy
 
@@ -205,15 +303,29 @@ echo ""
 echo "=== Setup complete! ==="
 echo ""
 echo "Usage:"
-echo "  ./launch-devbox.sh shell        # interactive shell"
-echo "  ./launch-devbox.sh code-server  # VS Code in browser"
-echo "  ./launch-devbox.sh rstudio      # RStudio in browser"
-echo "  ./launch-devbox.sh jupyter      # JupyterLab in browser"
+echo "  ~/bin/launch-devbox.sh shell        # interactive shell"
+echo "  ~/bin/launch-devbox.sh code-server  # VS Code in browser"
+echo "  ~/bin/launch-devbox.sh rstudio      # RStudio in browser"
+echo "  ~/bin/launch-devbox.sh jupyter      # JupyterLab in browser"
 echo ""
 echo "To add packages:"
 echo "  mamba install -n devbox <package>           # conda package"
 echo "  pip install <package>                       # Python package"
 echo "  Rscript -e 'install.packages(\"pkg\")'      # R package"
 echo "  npm install -g <package>                    # Node.js package"
+echo ""
+echo "Optional package profiles (install anytime):"
+echo "  ~/bin/launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor"
+echo "  ~/bin/launch-devbox.sh setup --with ml         # PyTorch with CUDA"
+echo "  ~/bin/launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms, etc."
+echo "  ~/bin/launch-devbox.sh setup --with all        # everything"
+if [[ ${#PROFILES[@]} -gt 0 ]]; then
+    echo ""
+    echo "Installed profiles: ${PROFILES[*]}"
+fi
+echo ""
+echo "To create additional conda environments:"
+echo "  mamba create -n myproject python=3.12"
+echo "  DEVBOX_ENV=myproject ~/bin/launch-devbox.sh shell"
 echo ""
 echo "Everything is stored in ~/.devbox/ — no container rebuild needed."

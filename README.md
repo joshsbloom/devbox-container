@@ -6,17 +6,10 @@ DevBox packages VS Code, RStudio, JupyterLab, Claude Code, Codex, R, Python,
 and a full bioinformatics stack into a containerized setup that runs on
 clusters with outdated operating systems — no root access required.
 
-## Why
-
-HPC clusters run old enterprise Linux (CentOS 7, RHEL 7) with libraries too
-ancient for modern tools. Users can't upgrade the OS or install system
-packages. DevBox solves this with two layers: an Apptainer container provides
-a modern Ubuntu base with system libraries, and conda environments on the
-user's home directory provide all the actual software. Users can freely
-install and update R, Python, and Node.js packages without rebuilding the
-container or needing admin help.
-
 ## How it works
+
+DevBox uses two layers so you get a modern environment without needing admin
+privileges:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -35,23 +28,37 @@ container or needing admin help.
 
 The container handles what needs root. Conda handles what needs flexibility.
 
-## Quick start
+## Quick start (Hoffman2)
+
+**If you're new to Hoffman2**, start with the step-by-step
+[User Guide](README-user.md) — it explains each command as you go.
+
+If you're comfortable with HPC clusters, here's the short version:
 
 ```bash
-# On Hoffman2 — copy scripts (one-time)
-mkdir -p ~/bin
-cp /u/project/kruglyak/PUBLIC_SHARED/containers/launch-devbox.sh ~/bin/
-cp /u/project/kruglyak/PUBLIC_SHARED/containers/devbox-setup.sh ~/bin/
-chmod +x ~/bin/launch-devbox.sh ~/bin/devbox-setup.sh
+# 1. SSH to Hoffman2
+ssh <user>@hoffman2.idre.ucla.edu
 
-# Get a compute node
-module load singularity
+# 2. Get the scripts (one-time)
+git clone https://github.com/joshsbloom/devbox-container.git ~/devbox-container
+mkdir -p ~/bin
+ln -sf ~/devbox-container/launch-devbox.sh ~/bin/launch-devbox.sh
+ln -sf ~/devbox-container/devbox-setup.sh ~/bin/devbox-setup.sh
+echo 'module load singularity' >> ~/.bashrc && source ~/.bashrc
+
+# 3. Get a compute node (setup needs resources — don't run on the login node)
 qrsh -l h_data=8G,h_rt=8:00:00 -pe shared 4
 
-# First-time setup (creates conda env, ~15-20 min)
+# 4. First-time setup (creates conda env with base packages)
 ~/bin/launch-devbox.sh setup
 
-# Start working
+# 5. Optionally add domain-specific packages (additive — install anytime)
+~/bin/launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor
+~/bin/launch-devbox.sh setup --with ml         # PyTorch with CUDA
+~/bin/launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms
+~/bin/launch-devbox.sh setup --with all        # everything
+
+# 6. Start working
 ~/bin/launch-devbox.sh shell
 ```
 
@@ -77,13 +84,20 @@ Rscript -e 'install.packages("qs2")'               # CRAN
 npm install -g some-tool                            # npm
 ```
 
+Create project-specific environments:
+
+```bash
+mamba create -n myproject python=3.11 pandas
+DEVBOX_ENV=myproject launch-devbox.sh shell
+```
+
 ## Documentation
 
 | Document | Audience | Contents |
 |----------|----------|----------|
-| **[README-user.md](README-user.md)** | Everyone | Setup guide, SSH tunneling, using each service, installing packages, tmux workflow, troubleshooting |
-| **[README-build.md](README-build.md)** | Admins | Building the container, deploying to the cluster, common build issues, when to rebuild |
-| **[README-architecture.md](README-architecture.md)** | Anyone curious | Why each piece exists, design decisions, tradeoffs, how to deploy on other clusters or cloud |
+| **[README-user.md](README-user.md)** | Everyone | Step-by-step setup, SSH tunneling, using each service, installing packages, troubleshooting |
+| **[README-build.md](README-build.md)** | Admins | Building the container, deploying to the cluster, common build issues |
+| **[README-architecture.md](README-architecture.md)** | Anyone curious | Why each piece exists, design decisions, deploying on other clusters |
 
 ## Files
 

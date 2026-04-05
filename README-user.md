@@ -12,33 +12,82 @@ The container itself is read-only and shared by everyone in the group.
 Your personal packages, environments, and settings live in `~/.devbox/`
 on your home directory and persist across sessions.
 
+---
+
 ## Quick start
 
-    # 1. SSH to Hoffman2
+### Step 1: Connect to Hoffman2
+
+From your laptop's terminal (Mac: Terminal.app or iTerm; Windows: PowerShell
+or WSL):
+
     ssh <user>@hoffman2.idre.ucla.edu
 
-    # 2. Copy the scripts to your ~/bin (one-time)
-    mkdir -p ~/bin
-    cp /u/project/kruglyak/PUBLIC_SHARED/containers/launch-devbox.sh ~/bin/
-    cp /u/project/kruglyak/PUBLIC_SHARED/containers/devbox-setup.sh ~/bin/
-    chmod +x ~/bin/launch-devbox.sh ~/bin/devbox-setup.sh
+Replace `<user>` with your Hoffman2 username. This puts you on a **login
+node** — a shared gateway machine. You should not run heavy computation
+here; it's just for managing jobs and files.
 
-    # 3. Add module load to your bashrc (one-time)
+**Tip:** Set up SSH keys so you don't have to type your password every time:
+https://www.hoffman2.idre.ucla.edu/SBO/devel/About/FAQ/FAQ.html#set-up-ssh-public-key-authentication
+
+### Step 2: Get the scripts (one-time)
+
+    git clone https://github.com/joshsbloom/devbox-container.git ~/devbox-container
+    mkdir -p ~/bin
+    ln -sf ~/devbox-container/launch-devbox.sh ~/bin/launch-devbox.sh
+    ln -sf ~/devbox-container/devbox-setup.sh ~/bin/devbox-setup.sh
+
+This clones the devbox repository and creates symlinks in `~/bin` so you
+can run the scripts from anywhere. You only need to do this once.
+
+### Step 3: Load the container runtime (one-time)
+
     echo 'module load singularity' >> ~/.bashrc
     source ~/.bashrc
 
-    # 4. Get onto a compute node
+Hoffman2 uses `module load` to make software available. This adds
+Singularity (the tool that runs containers) to every future session.
+
+### Step 4: Get a compute node
+
     qrsh -l h_data=16G,h_rt=4:00:00 -pe shared 4
 
-    # 5. Run first-time setup (creates your conda environment, ~15-20 min)
+This requests an interactive session on a **compute node** — a machine
+dedicated to your work. The flags mean:
+
+- `h_data=16G` — 16 GB of memory per core
+- `h_rt=4:00:00` — up to 4 hours of wall time
+- `-pe shared 4` — 4 CPU cores
+
+You'll wait briefly in the queue, then your prompt will change to show the
+compute node's name (e.g., `n7234`). **Note this name** — you'll need it
+later for SSH tunneling.
+
+### Step 5: Run first-time setup
+
     ~/bin/launch-devbox.sh setup
 
-    # 6. Start working
+This creates your personal conda environment with R, Python, Node.js, and
+core packages. It takes about 15-20 minutes on the first run. You'll see
+progress as packages are downloaded and installed.
+
+### Step 6: Start working
+
     ~/bin/launch-devbox.sh shell
+
+You're now inside the devbox container with R, Python, and all your tools
+available. Your prompt will show `(devbox)` to indicate you're in the
+container environment.
+
+To exit the container, type `exit` or press `Ctrl-d`.
+
+---
 
 ## Available commands
 
-    ~/bin/launch-devbox.sh setup          # First-time setup
+Once setup is complete, these are the commands you'll use day-to-day.
+All commands are run **on a compute node** (after `qrsh`):
+
     ~/bin/launch-devbox.sh shell          # Interactive shell
     ~/bin/launch-devbox.sh code-server    # VS Code in browser (port 8080)
     ~/bin/launch-devbox.sh rstudio        # RStudio in browser (port 8787)
@@ -48,15 +97,47 @@ on your home directory and persist across sessions.
     ~/bin/launch-devbox.sh gpu-job        # Request a GPU node, then launch shell
     ~/bin/launch-devbox.sh exec <cmd>     # Run any command in the container
 
+Run `~/bin/launch-devbox.sh` with no arguments to see all options.
+
+---
+
+## Optional package profiles
+
+The base setup gives you R, Python, Node.js, core data science packages
+(numpy, pandas, scikit-learn, matplotlib, etc.), JupyterLab, and CLI tools
+(Claude Code, Codex).
+
+For domain-specific packages, install **profiles**. Profiles are additive —
+you can add them at any time without reinstalling anything:
+
+    ~/bin/launch-devbox.sh setup --with bioinfo    # pysam, scanpy, Bioconductor, snakemake
+    ~/bin/launch-devbox.sh setup --with ml         # PyTorch with CUDA support
+    ~/bin/launch-devbox.sh setup --with r-extra    # tidyverse, lme4, brms, Bioconductor, etc.
+    ~/bin/launch-devbox.sh setup --with all        # everything
+
+You can combine profiles in one command: `--with bioinfo,ml`
+
+You can also install profiles during the initial setup:
+
+    ~/bin/launch-devbox.sh setup --with all
+
+To start over with a clean environment:
+
+    mamba env remove -p ~/.devbox/conda/envs/devbox
+    ~/bin/launch-devbox.sh setup --with bioinfo,ml
+
+---
+
 ## Installing packages
 
-No container rebuild needed — just install directly:
+You can install packages directly without rebuilding anything. Run these
+commands from inside a devbox shell (`launch-devbox.sh shell`):
 
     # Conda / Mamba (recommended for most things)
     mamba install -n devbox -c conda-forge <package>
     mamba install -n devbox -c bioconda <package>
 
-    # Python (PyPI)
+    # Python (PyPI) — use when a package isn't available via conda
     pip install <package>
 
     # R (CRAN)
@@ -72,59 +153,45 @@ All installed packages are stored in `~/.devbox/` and persist across sessions.
 They are isolated from any R/Python/Node packages you may have installed
 directly on Hoffman2 outside the container.
 
-## GPU access
-
-    # Request a GPU node interactively
-    qrsh -l gpu,V100,h_data=16G,h_rt=4:00:00 -pe shared 4
-
-    # Or let the script handle it
-    GPU_TYPE=V100 ~/bin/launch-devbox.sh gpu-job
-
-    # The script auto-detects GPUs — no extra flags needed
-    ~/bin/launch-devbox.sh shell
-    # → "[devbox] GPU detected — enabling --nv"
-
-    # Verify inside the container
-    nvidia-smi
-    python -c "import torch; print(torch.cuda.get_device_name(0))"
-
-Available GPU types on Hoffman2: P4, V100, A100, RTX2080Ti (check current
-availability with the Hoffman2 documentation).
-
 ---
 
 ## SSH tunneling (for browser-based tools)
 
-When you run code-server, RStudio, or JupyterLab on a compute node, you
-need an SSH tunnel from your laptop through the login node to the compute
-node. Your laptop cannot reach compute nodes directly.
+VS Code, RStudio, and JupyterLab run as web servers on a compute node.
+Your laptop can't connect to compute nodes directly — it has to go through
+the login node. An SSH tunnel creates this connection.
 
-### How it works
+### The idea
 
     Your laptop  →  Hoffman2 login node  →  Compute node (n7234)
     localhost:8080    (passthrough)          code-server listening here
 
+You tell SSH: "when I visit `localhost:8080` on my laptop, forward that
+to port `8080` on compute node `n7234`, going through Hoffman2."
+
 ### Step by step
 
-**1. Start the service on the compute node:**
+**1. Start the service on the compute node** (in your existing SSH session):
 
-    # On the compute node (after qrsh)
     ~/bin/launch-devbox.sh code-server
 
-The script prints the tunnel command you need:
+The script prints the exact tunnel command you need — just copy it:
 
     Compute node: n7234
     SSH tunnel:   ssh -L 8080:n7234:8080 <user>@hoffman2.idre.ucla.edu
     Open:         http://localhost:8080
 
-**2. Open the tunnel from your laptop** (in a NEW terminal):
+**2. Open a NEW terminal on your laptop** and run the tunnel command:
 
     ssh -L 8080:n7234:8080 <user>@hoffman2.idre.ucla.edu
 
-Replace `n7234` with whatever the script printed. This terminal must
-stay open as long as you want to use the service.
+Replace `n7234` with whatever the script printed. This terminal must stay
+open as long as you want to use the service — it's holding the tunnel open.
 
 **3. Open your browser** and go to `http://localhost:8080`.
+
+That's it. The browser talks to your laptop's port 8080, SSH forwards it
+through the login node to the compute node, and code-server responds.
 
 ### Ports for each service
 
@@ -140,10 +207,16 @@ If a port is in use (another user on the same node), change it:
     RSTUDIO_PORT=8788 ~/bin/launch-devbox.sh rstudio
     JUPYTER_PORT=8889 ~/bin/launch-devbox.sh jupyter
 
+### Avoid typing your password every time
+
+Set up SSH key authentication so you don't need a password for login or
+tunneling. Follow Hoffman2's guide:
+https://www.hoffman2.idre.ucla.edu/SBO/devel/About/FAQ/FAQ.html#set-up-ssh-public-key-authentication
+
 ### Simplify with SSH config
 
 Add this to `~/.ssh/config` on your **laptop** to avoid typing the full
-SSH command every time:
+hostname every time:
 
     Host hoffman2
         HostName hoffman2.idre.ucla.edu
@@ -165,9 +238,12 @@ You can run multiple tunnels in one SSH connection:
 
 ## Using tmux (recommended)
 
-Run tmux on the **compute node** so your sessions survive SSH disconnects.
-If your laptop closes or the connection drops, everything keeps running
-and you can reattach.
+If your SSH connection drops (laptop closes, Wi-Fi blips), anything running
+in that session dies — including code-server, RStudio, or a long computation.
+
+**tmux** is a terminal multiplexer that keeps your sessions alive on the
+compute node even after you disconnect. Think of it as a persistent
+terminal session that lives on the server.
 
 ### Basic workflow
 
@@ -177,32 +253,32 @@ and you can reattach.
     # Get a compute node
     qrsh -l h_data=16G,h_rt=8:00:00 -pe shared 4
 
-    # Start tmux on the compute node
+    # Start a tmux session on the compute node
     tmux new -s devbox
 
-    # Launch your service inside tmux
+    # Now launch your service inside tmux
     ~/bin/launch-devbox.sh code-server
 
 If your SSH drops, reconnect and reattach:
 
     ssh hoffman2
-    ssh n7234              # same compute node (note the name beforehand)
-    tmux attach -t devbox
+    ssh n7234              # SSH directly to the same compute node
+    tmux attach -t devbox  # reattach — everything is still running
 
 ### Running multiple services
 
-Use tmux panes to run several services at once:
+Use tmux panes to run several services side by side:
 
     tmux new -s devbox
 
     # Pane 1: code-server
     ~/bin/launch-devbox.sh code-server
 
-    # Ctrl-b %  (split vertically)
+    # Ctrl-b %  (split vertically — creates a new pane to the right)
     # Pane 2: RStudio
     ~/bin/launch-devbox.sh rstudio
 
-    # Ctrl-b "  (split horizontally)
+    # Ctrl-b "  (split horizontally — creates a new pane below)
     # Pane 3: interactive shell
     ~/bin/launch-devbox.sh shell
 
@@ -215,7 +291,7 @@ Use tmux panes to run several services at once:
     Ctrl-b %                 # split pane vertically
     Ctrl-b "                 # split pane horizontally
     Ctrl-b arrow-key         # move between panes
-    Ctrl-b d                 # detach (session keeps running)
+    Ctrl-b d                 # detach (session keeps running in background)
     Ctrl-b x                 # kill current pane
 
 **Important:** Run tmux on the compute node, not the login node. tmux on
@@ -229,7 +305,7 @@ it) would still die if the connection drops.
     # On compute node
     ~/bin/launch-devbox.sh code-server
 
-    # Tunnel from laptop
+    # Tunnel from laptop (in a new terminal)
     ssh -L 8080:<node>:8080 hoffman2
 
     # Open http://localhost:8080
@@ -264,7 +340,7 @@ The script prints your login credentials:
     Username: <your-hoffman2-username>
     Password: <auto-generated random password>
 
-    # Tunnel from laptop
+    # Tunnel from laptop (in a new terminal)
     ssh -L 8787:<node>:8787 hoffman2
 
     # Open http://localhost:8787
@@ -354,7 +430,62 @@ OpenAI's Codex CLI is another AI coding agent.
 
 ---
 
-## Important notes
+## GPU access
+
+    # Request a GPU node interactively
+    qrsh -l gpu,V100,h_data=16G,h_rt=4:00:00 -pe shared 4
+
+    # Or let the script handle it
+    GPU_TYPE=V100 ~/bin/launch-devbox.sh gpu-job
+
+    # The script auto-detects GPUs — no extra flags needed
+    ~/bin/launch-devbox.sh shell
+    # → "[devbox] GPU detected — enabling --nv"
+
+    # Verify inside the container
+    nvidia-smi
+    python -c "import torch; print(torch.cuda.get_device_name(0))"
+
+Available GPU types on Hoffman2: P4, V100, A100, RTX2080Ti (check current
+availability with the Hoffman2 documentation).
+
+---
+
+## Advanced topics
+
+### Using a different conda environment
+
+The default environment is called `devbox`. You can create additional
+environments for specific projects:
+
+    # Inside a devbox shell
+    mamba create -n myproject python=3.11 pandas scikit-learn
+
+    # Launch a shell using that environment
+    DEVBOX_ENV=myproject ~/bin/launch-devbox.sh shell
+
+Custom environments are stored alongside `devbox` in `~/.devbox/conda/envs/`
+and are managed with standard conda/mamba commands (`conda activate`,
+`mamba install -n myproject`, etc.).
+
+### Shell customizations
+
+Your personal shell settings (aliases, environment variables, etc.) go in
+`~/.devbox/bashrc_user`. This file is sourced at the end of every devbox
+shell session and is never overwritten by the launch script.
+
+    vim ~/.devbox/bashrc_user
+
+### Verbose mode
+
+To see the underlying Singularity/Apptainer commands that devbox runs
+(useful for learning or debugging):
+
+    ~/bin/launch-devbox.sh --verbose shell
+
+---
+
+## Troubleshooting
 
 ### First-time slowness
 
@@ -366,31 +497,6 @@ this up, add these to your `~/.bashrc`:
     export SINGULARITY_CACHEDIR=/u/scratch/$USER/singularity-cache
     mkdir -p $SINGULARITY_TMPDIR $SINGULARITY_CACHEDIR
 
-### File locations
-
-Everything user-specific lives under `~/.devbox/`:
-
-    ~/.devbox/
-    ├── conda/envs/devbox/    # Your conda environment (R, Python, Node.js)
-    ├── conda/pkgs/           # Conda package cache
-    ├── R/library/            # R packages from install.packages()
-    ├── R/Renviron            # R environment config
-    ├── pip/                  # pip --user packages
-    ├── npm-global/           # Global npm packages (Claude Code, Codex)
-    ├── renv-cache/           # renv package cache
-    ├── jupyter/              # Jupyter config and kernels
-    ├── rstudio/              # RStudio Server state
-    ├── bashrc                # Shell init file (auto-generated by launch script)
-    ├── env                   # API keys (chmod 600)
-    └── tmp/                  # Per-session temp directories
-
-### Isolation from host
-
-The container is fully isolated from Hoffman2's native R/Python. Packages
-installed via `module load R` on the host will NOT be visible inside the
-container, and vice versa. This is intentional — it prevents version
-conflicts and ensures reproducibility.
-
 ### Rebuilding your environment
 
 If your conda environment gets corrupted or you want a fresh start:
@@ -401,7 +507,37 @@ If your conda environment gets corrupted or you want a fresh start:
     # Re-run setup
     ~/bin/launch-devbox.sh setup
 
+### Isolation from host
+
+The container is fully isolated from Hoffman2's native R/Python. Packages
+installed via `module load R` on the host will NOT be visible inside the
+container, and vice versa. This is intentional — it prevents version
+conflicts and ensures reproducibility.
+
 ### Getting help
 
     ~/bin/launch-devbox.sh          # Shows all commands and options
     ~/bin/launch-devbox.sh --help   # Same thing
+
+---
+
+## File locations
+
+Everything user-specific lives under `~/.devbox/`:
+
+    ~/.devbox/
+    ├── conda/envs/devbox/    # Your conda environment (R, Python, Node.js)
+    ├── conda/envs/*/         # Additional conda environments (DEVBOX_ENV)
+    ├── conda/pkgs/           # Conda package cache
+    ├── R/library/            # R packages from install.packages()
+    ├── R/Renviron            # R environment config
+    ├── pip/                  # pip --user packages
+    ├── npm-global/           # Global npm packages (Claude Code, Codex)
+    ├── renv-cache/           # renv package cache
+    ├── jupyter/              # Jupyter config and kernels
+    ├── rstudio/              # RStudio Server state
+    ├── bashrc                # Shell init file (auto-generated by launch script)
+    ├── bashrc_user           # Your personal shell customizations (never overwritten)
+    ├── installed_profiles    # Tracks which profiles have been installed
+    ├── env                   # API keys (chmod 600)
+    └── tmp/                  # Per-session temp directories

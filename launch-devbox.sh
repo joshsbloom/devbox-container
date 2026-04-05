@@ -8,7 +8,7 @@
 #   3. Run this script on the compute node
 #
 # Usage:
-#   ./launch-devbox.sh setup          # first-time setup (creates conda env)
+#   ./launch-devbox.sh setup [--with bioinfo,ml]  # first-time setup
 #   ./launch-devbox.sh shell          # interactive shell
 #   ./launch-devbox.sh code-server    # VS Code in browser
 #   ./launch-devbox.sh rstudio        # RStudio Server in browser
@@ -20,16 +20,22 @@
 #
 # Options:
 #   --no-gpu / --cpu                  # disable GPU passthrough
+#   --verbose / -v                    # print singularity commands
+#   DEVBOX_ENV=myenv                  # use a different conda environment
 # ──────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-# ── Configuration ────────────────────────────────────────────────────────
+# ── Cluster configuration ───────────────────────────────────────────────
+# Change these when adapting for a different cluster
 SIF="${DEVBOX_SIF:-/u/project/kruglyak/PUBLIC_SHARED/containers/devbox-gpu.sif}"
+LOGIN_HOST="${DEVBOX_LOGIN_HOST:-hoffman2.idre.ucla.edu}"
+GPU_JOB_CMD="${DEVBOX_GPU_JOB_CMD:-qrsh}"    # qrsh (SGE), srun (SLURM)
+EXTRA_BIND_PATHS="${DEVBOX_EXTRA_BINDS:-}"    # colon-separated additional bind paths
 
 DEVBOX_HOME="$HOME/.devbox"
-ENV_PATH="$DEVBOX_HOME/conda/envs/devbox"
+ENV_NAME="${DEVBOX_ENV:-devbox}"
+ENV_PATH="$DEVBOX_HOME/conda/envs/$ENV_NAME"
 COMPUTE_NODE=$(hostname)
-LOGIN_HOST="hoffman2.idre.ucla.edu"
 
 CODE_SERVER_PORT="${CODE_SERVER_PORT:-8080}"
 RSTUDIO_PORT="${RSTUDIO_PORT:-8787}"
@@ -50,10 +56,12 @@ print_tunnel() {
 
 # ── Parse flags ──────────────────────────────────────────────────────────
 FORCE_NO_GPU=false
+VERBOSE=false
 ARGS=()
 for arg in "$@"; do
     case "$arg" in
         --no-gpu|--cpu) FORCE_NO_GPU=true ;;
+        --verbose|-v) VERBOSE=true ;;
         *) ARGS+=("$arg") ;;
     esac
 done
@@ -72,6 +80,14 @@ fi
 BINDS=("--bind" "$HOME:$HOME")
 [[ -d "/u/scratch" ]] && BINDS+=("--bind" "/u/scratch:/u/scratch")
 [[ -d "/u/project" ]] && BINDS+=("--bind" "/u/project:/u/project")
+
+# Extra bind paths for other clusters
+if [[ -n "$EXTRA_BIND_PATHS" ]]; then
+    IFS=':' read -ra EXTRA_BINDS <<< "$EXTRA_BIND_PATHS"
+    for bp in "${EXTRA_BINDS[@]}"; do
+        [[ -d "$bp" ]] && BINDS+=("--bind" "$bp:$bp")
+    done
+fi
 
 # Per-user /tmp to avoid collisions on shared compute nodes
 USER_TMP="$DEVBOX_HOME/tmp/${COMPUTE_NODE}-$$"
@@ -108,15 +124,18 @@ set_container_env JUPYTER_RUNTIME_DIR "$DEVBOX_HOME/jupyter/runtime"
 set_container_env CHOKIDAR_USEPOLLING 1
 set_container_env TSC_WATCHFILE UseFsEventsWithFallbackDynamicPolling
 
-# Activate the devbox conda env by prepending it to PATH
+# Activate the conda env by prepending to the container's default PATH
 if [[ -d "$ENV_PATH/bin" ]]; then
-    DEVBOX_PATH="$ENV_PATH/bin:$DEVBOX_HOME/npm-global/bin:/opt/miniforge3/bin:/opt/code-server/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    # Only set PATH inside the container — don't clobber host PATH
-    export SINGULARITYENV_PATH="$DEVBOX_PATH"
-    export APPTAINERENV_PATH="$DEVBOX_PATH"
-    set_container_env CONDA_DEFAULT_ENV "devbox"
+    DEVBOX_PATH="$ENV_PATH/bin:$DEVBOX_HOME/npm-global/bin"
+    CONTAINER_BASE_PATH="/opt/miniforge3/bin:/opt/code-server/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    FULL_PATH="${DEVBOX_PATH}:${CONTAINER_BASE_PATH}"
+    export SINGULARITYENV_PATH="$FULL_PATH"
+    export APPTAINERENV_PATH="$FULL_PATH"
+    set_container_env CONDA_DEFAULT_ENV "$ENV_NAME"
     set_container_env CONDA_PREFIX "$ENV_PATH"
 fi
+
+[[ "$ENV_NAME" != "devbox" ]] && echo "[devbox] Using conda environment: $ENV_NAME"
 
 # ── Write shell init file for code-server / RStudio terminals ────────────
 # code-server and RStudio spawn their own terminal shells that don't
@@ -129,8 +148,8 @@ cat > "$DEVBOX_BASHRC" <<RCEOF
 [[ -f /etc/bash.bashrc ]] && source /etc/bash.bashrc
 [[ -f \$HOME/.bashrc_hoffman2 ]] && source \$HOME/.bashrc_hoffman2
 
-export PATH="$DEVBOX_PATH"
-export CONDA_DEFAULT_ENV="devbox"
+export PATH="$FULL_PATH"
+export CONDA_DEFAULT_ENV="$ENV_NAME"
 export CONDA_PREFIX="$ENV_PATH"
 export CONDA_ENVS_PATH="$DEVBOX_HOME/conda/envs"
 export CONDA_PKGS_DIRS="$DEVBOX_HOME/conda/pkgs"
@@ -148,11 +167,30 @@ export JUPYTER_RUNTIME_DIR="$DEVBOX_HOME/jupyter/runtime"
 eval "\$(conda shell.bash hook)" 2>/dev/null
 conda activate "$ENV_PATH" 2>/dev/null
 
-export PS1="(devbox) \u@\h:\w\$ "
+export PS1="($ENV_NAME) \u@\h:\w\$ "
+
+# User customizations — this file is never overwritten by devbox
+[[ -f "$DEVBOX_HOME/bashrc_user" ]] && source "$DEVBOX_HOME/bashrc_user"
 RCEOF
+
+# Create bashrc_user if it doesn't exist
+if [[ ! -f "$DEVBOX_HOME/bashrc_user" ]]; then
+    cat > "$DEVBOX_HOME/bashrc_user" <<'USERINIT'
+# ~/.devbox/bashrc_user — Your personal shell customizations
+# This file is sourced at the end of every devbox shell session.
+# Unlike bashrc, this file is never overwritten by launch-devbox.sh.
+#
+# Examples:
+#   alias ll='ls -lah'
+#   export MY_PROJECT=/u/project/kruglyak/mydata
+USERINIT
+fi
 
 # ── Helper: run inside container ─────────────────────────────────────────
 run_in_container() {
+    if [[ "$VERBOSE" == true ]]; then
+        echo "[devbox] singularity exec ${GPU_FLAGS[*]+"${GPU_FLAGS[*]}"} ${BINDS[*]} $SIF $*"
+    fi
     singularity exec \
         "${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"}" \
         "${BINDS[@]}" \
@@ -170,17 +208,23 @@ case "$MODE" in
             echo "        Set DEVBOX_SIF or copy devbox-gpu.sif to ~/containers/"
             exit 1
         fi
-        # Run the setup script inside the container
+        # Pass remaining args (e.g., --with bioinfo,ml) to the setup script
         SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-        run_in_container bash "$SCRIPT_DIR/devbox-setup.sh"
+        run_in_container bash "$SCRIPT_DIR/devbox-setup.sh" "${@:2}"
         ;;
 
     shell)
         if [[ ! -d "$ENV_PATH" ]]; then
-            echo "[error] Conda env not found. Run: $0 setup"
+            echo "[error] Conda env '$ENV_NAME' not found at $ENV_PATH"
+            if [[ "$ENV_NAME" == "devbox" ]]; then
+                echo "        Run: $0 setup"
+            else
+                echo "        Create it: $0 shell  (then: mamba create -n $ENV_NAME ...)"
+                echo "        Or use the default: unset DEVBOX_ENV && $0 shell"
+            fi
             exit 1
         fi
-        echo "Launching devbox shell..."
+        echo "Launching devbox shell ($ENV_NAME)..."
         singularity exec \
             "${GPU_FLAGS[@]+"${GPU_FLAGS[@]}"}" \
             "${BINDS[@]}" \
@@ -193,13 +237,13 @@ case "$MODE" in
         print_tunnel "$CODE_SERVER_PORT"
         echo "  Password: ~/.config/code-server/config.yaml"
 
-        # Write code-server settings:
-        # - Terminal uses devbox bashrc
-        # - R/Python extensions point to conda env
-        # - File watcher exclusions to prevent inotify exhaustion
-        #   (ptyHost crashes when inotify limits are hit on large dirs)
-        mkdir -p "$HOME/.local/share/code-server/User"
-        cat > "$HOME/.local/share/code-server/User/settings.json" <<CSEOF
+        # Write devbox-managed code-server settings for terminal and
+        # language extension integration. User settings in settings.json
+        # are preserved — devbox writes to a separate file that
+        # code-server merges via machine settings.
+        CS_MACHINE_DIR="$HOME/.local/share/code-server/Machine"
+        mkdir -p "$CS_MACHINE_DIR"
+        cat > "$CS_MACHINE_DIR/settings.json" <<CSEOF
 {
     "terminal.integrated.profiles.linux": {
         "devbox": {
@@ -209,7 +253,7 @@ case "$MODE" in
     },
     "terminal.integrated.defaultProfile.linux": "devbox",
     "terminal.integrated.env.linux": {
-        "PATH": "$DEVBOX_PATH"
+        "PATH": "$FULL_PATH"
     },
     "r.rpath.linux": "$ENV_PATH/bin/R",
     "r.rterm.linux": "$ENV_PATH/bin/R",
@@ -332,12 +376,10 @@ JPYEOF
         ;;
 
     claude)
-        echo "[devbox] Note: requires internet (may not work on compute nodes)"
         run_in_container claude "${@:2}"
         ;;
 
     codex)
-        echo "[devbox] Note: requires internet (may not work on compute nodes)"
         run_in_container codex "${@:2}"
         ;;
 
@@ -351,23 +393,24 @@ JPYEOF
         MEM="${MEM:-16G}"
         TIME="${TIME:-4:00:00}"
         echo "Requesting GPU session: $GPU_TYPE, ${CORES} cores, ${MEM}/core, ${TIME}..."
-        qrsh -l "gpu,${GPU_TYPE},h_data=${MEM},h_rt=${TIME}" \
+        # SGE syntax — change DEVBOX_GPU_JOB_CMD for other schedulers
+        "$GPU_JOB_CMD" -l "gpu,${GPU_TYPE},h_data=${MEM},h_rt=${TIME}" \
              -pe "shared" "$CORES" \
              "$0" shell
         ;;
 
     *)
         cat <<USAGE
-Usage: $0 [--no-gpu|--cpu] <command>
+Usage: $0 [--no-gpu|--cpu] [--verbose|-v] <command>
 
 Commands:
-  setup        First-time setup — creates conda env with R, Python, Node.js
+  setup [--with profiles]   First-time setup (profiles: bioinfo, ml, r-extra)
   shell        Interactive shell
   code-server  VS Code in the browser
   rstudio      RStudio Server in the browser
   jupyter      JupyterLab in the browser
-  claude       Claude Code CLI (needs internet)
-  codex        Codex CLI (needs internet)
+  claude       Claude Code CLI
+  codex        Codex CLI
   gpu-job      Request GPU node, then launch shell
   exec <cmd>   Run arbitrary command
 
@@ -378,16 +421,29 @@ Adding packages (no rebuild needed):
   Rscript -e 'BiocManager::install("pkg")'    # Bioconductor
   npm install -g <package>                     # npm
 
+Optional package profiles (can be installed anytime):
+  $0 setup --with bioinfo    # pysam, pybedtools, scanpy, Bioconductor
+  $0 setup --with ml         # PyTorch with CUDA support
+  $0 setup --with r-extra    # tidyverse, Bioconductor, lme4, brms, etc.
+  $0 setup --with all        # everything
+
+Using a different conda environment:
+  DEVBOX_ENV=myproject $0 shell
+
 Environment variables:
-  DEVBOX_SIF          .sif path (default: group shared or ~/containers/)
-  CODE_SERVER_PORT    code-server port (default: 8080)
-  RSTUDIO_PORT        RStudio port (default: 8787)
-  RSTUDIO_PASSWORD    RStudio password (default: auto-generated)
-  JUPYTER_PORT        Jupyter port (default: 8888)
-  GPU_TYPE            GPU type for gpu-job (default: P4)
-  CORES               CPU cores for gpu-job (default: 4)
-  MEM                 Memory per core for gpu-job (default: 16G)
-  TIME                Wall time for gpu-job (default: 4:00:00)
+  DEVBOX_SIF            .sif path (default: group shared)
+  DEVBOX_ENV            conda env name (default: devbox)
+  DEVBOX_LOGIN_HOST     login node hostname (default: hoffman2.idre.ucla.edu)
+  DEVBOX_GPU_JOB_CMD    GPU job command (default: qrsh)
+  DEVBOX_EXTRA_BINDS    extra bind mount paths, colon-separated
+  CODE_SERVER_PORT      code-server port (default: 8080)
+  RSTUDIO_PORT          RStudio port (default: 8787)
+  RSTUDIO_PASSWORD      RStudio password (default: auto-generated)
+  JUPYTER_PORT          Jupyter port (default: 8888)
+  GPU_TYPE              GPU type for gpu-job (default: P4)
+  CORES                 CPU cores for gpu-job (default: 4)
+  MEM                   Memory per core for gpu-job (default: 16G)
+  TIME                  Wall time for gpu-job (default: 4:00:00)
 USAGE
         exit 1
         ;;

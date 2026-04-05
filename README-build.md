@@ -42,14 +42,22 @@ Install Apptainer (or Singularity):
 
 ## What the setup script installs (per user)
 
-The `devbox-setup.sh` script creates a conda environment with:
+The `devbox-setup.sh` script creates a conda environment. The base setup
+includes:
 - Python 3.12, R 4.5, Node.js 20
 - Intel MKL as the BLAS/LAPACK backend (for R and numpy)
-- PyTorch with CUDA 12.4 support
-- Bioinformatics: pysam, pybedtools, scanpy, anndata, snakemake
-- R: tidyverse, data.table, Bioconductor core, renv, languageserver, httpgd
+- Core data science: numpy, scipy, pandas, scikit-learn, matplotlib, etc.
+- R: irkernel, languageserver, httpgd
 - CLI: Claude Code, OpenAI Codex
 - JupyterLab with R and Python kernels
+
+Optional profiles add domain-specific packages:
+- `--with bioinfo`: pysam, pybedtools, scanpy, snakemake, Bioconductor
+- `--with ml`: PyTorch with CUDA 12.4 support
+- `--with r-extra`: tidyverse, data.table, lme4, brms, Bioconductor, etc.
+- `--with all`: everything above
+
+Profiles can be installed during initial setup or added later.
 
 ## Building
 
