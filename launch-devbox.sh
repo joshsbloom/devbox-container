@@ -356,12 +356,14 @@ exec bash --rcfile "$DEVBOX_BASHRC" "\$@"
 TSHEOF
         chmod +x "$TERMINAL_SHELL"
 
-        # Write rsession.conf that points to our wrapper and terminal shell
+        # RStudio terminals use $SHELL — point it to our wrapper
+        set_container_env SHELL "$TERMINAL_SHELL"
+
+        # Write rsession.conf
         cat > "$DEVBOX_HOME/rstudio/rsession.conf" <<RSCONFEOF
 session-timeout-minutes=0
 session-default-working-dir=$HOME
 session-default-new-project-dir=$HOME
-session-default-shell-path=$TERMINAL_SHELL
 RSCONFEOF
 
         echo "Starting RStudio Server on port $RSTUDIO_PORT..."
