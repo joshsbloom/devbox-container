@@ -118,6 +118,10 @@ set_container_env NPM_CONFIG_PREFIX "$DEVBOX_HOME/npm-global"
 set_container_env JUPYTER_DATA_DIR "$DEVBOX_HOME/jupyter"
 set_container_env JUPYTER_RUNTIME_DIR "$DEVBOX_HOME/jupyter/runtime"
 
+# Timezone — the container's /etc/localtime may not match the host.
+# Set TZ explicitly so R, Python, and RStudio use the correct timezone.
+set_container_env TZ "${TZ:-America/Los_Angeles}"
+
 # Force polling-based file watching instead of inotify
 # Hoffman2 has low inotify limits (~8192) that can't be changed without root.
 # VS Code/code-server crashes (ptyHost SIGINT) when these are exhausted.
