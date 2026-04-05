@@ -337,8 +337,7 @@ DBEOF
         export RSTUDIO_WHICH_R="$ENV_PATH/bin/R"
 
         # Create rsession wrapper that sets up the devbox environment
-        # This ensures both the R session and the RStudio terminal
-        # have the correct PATH and library paths
+        # This ensures the R session has the correct PATH and library paths
         RSESSION_WRAPPER="$DEVBOX_HOME/rstudio/rsession.sh"
         cat > "$RSESSION_WRAPPER" <<RSEOF
 #!/usr/bin/env bash
@@ -347,11 +346,22 @@ exec /usr/lib/rstudio-server/bin/rsession "\$@"
 RSEOF
         chmod +x "$RSESSION_WRAPPER"
 
-        # Write rsession.conf that points to our wrapper and bashrc
+        # Create a terminal shell wrapper that uses --rcfile to source ONLY
+        # the devbox bashrc. Without this, the host ~/.bashrc runs after
+        # /etc/bash.bashrc and clobbers the devbox PATH.
+        TERMINAL_SHELL="$DEVBOX_HOME/rstudio/terminal-shell.sh"
+        cat > "$TERMINAL_SHELL" <<TSHEOF
+#!/bin/bash
+exec bash --rcfile "$DEVBOX_BASHRC" "\$@"
+TSHEOF
+        chmod +x "$TERMINAL_SHELL"
+
+        # Write rsession.conf that points to our wrapper and terminal shell
         cat > "$DEVBOX_HOME/rstudio/rsession.conf" <<RSCONFEOF
 session-timeout-minutes=0
 session-default-working-dir=$HOME
 session-default-new-project-dir=$HOME
+session-default-shell-path=$TERMINAL_SHELL
 RSCONFEOF
 
         echo "Starting RStudio Server on port $RSTUDIO_PORT..."
