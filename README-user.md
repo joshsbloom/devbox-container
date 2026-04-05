@@ -47,10 +47,14 @@ creates symlinks in `~/Local/bin` so the scripts are easy to run.
     echo 'module load singularity' >> ~/.bashrc
     source ~/.bashrc
 
-This does two things:
-- Adds `~/Local/bin` to your `PATH`, so you can type `launch-devbox.sh`
-  instead of the full path `~/Local/bin/launch-devbox.sh`
-- Loads Singularity (the tool that runs containers) in every future session
+These lines are appended to your `~/.bashrc`, which runs automatically
+every time you open a new shell. This means you only need to do this once:
+- `export PATH=...` — lets you type `launch-devbox.sh` instead of the
+  full path `~/Local/bin/launch-devbox.sh`
+- `module load singularity` — makes the `singularity` command available
+  (it's not on Hoffman2's PATH by default)
+
+The `source ~/.bashrc` applies the changes to your current session.
 
 ### Step 4: Get a compute node
 

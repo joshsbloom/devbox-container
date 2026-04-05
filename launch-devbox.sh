@@ -167,7 +167,15 @@ export JUPYTER_RUNTIME_DIR="$DEVBOX_HOME/jupyter/runtime"
 eval "\$(conda shell.bash hook)" 2>/dev/null
 conda activate "$ENV_PATH" 2>/dev/null
 
-export PS1="($ENV_NAME) \u@\h:\w\$ "
+# ── Pretty prompt and colors ──
+export TERM=xterm-256color
+alias ls='ls --color=auto'
+alias ll='ls -lah --color=auto'
+alias grep='grep --color=auto'
+
+# Colored prompt: (env) user@host:dir$
+#   env  = magenta, user@host = green, dir = blue
+export PS1='\[\e[35m\]($ENV_NAME)\[\e[0m\] \[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]\$ '
 
 # User customizations — this file is never overwritten by devbox
 [[ -f "$DEVBOX_HOME/bashrc_user" ]] && source "$DEVBOX_HOME/bashrc_user"
