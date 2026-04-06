@@ -549,6 +549,18 @@ Custom environments are stored alongside `devbox` in `~/.devbox/conda/envs/`
 and are managed with standard conda/mamba commands (`conda activate`,
 `mamba install -n myproject`, etc.).
 
+You can also launch services with a custom environment:
+
+    DEVBOX_ENV=myproject launch-devbox.sh rstudio
+    DEVBOX_ENV=myproject launch-devbox.sh jupyter
+
+**Note:** The service needs to be installed in that environment to work.
+For example, RStudio requires `r-base`, and JupyterLab requires
+`jupyterlab`. If you only need Python, a minimal environment is fine:
+
+    mamba create -n myproject python=3.11 pandas jupyterlab
+    DEVBOX_ENV=myproject launch-devbox.sh jupyter
+
 ### Shell customizations
 
 Your personal shell settings (aliases, environment variables, etc.) go in
