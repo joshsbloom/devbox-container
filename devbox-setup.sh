@@ -216,7 +216,7 @@ mamba install -y -p "$ENV_PATH" -c conda-forge \
 # can find them when compiling R packages from source (the system -dev
 # libs in the container are not on conda gcc's search path)
 echo "[setup] Installing C libraries for R package compilation..."
-mamba install -y -p "$ENV_PATH" -c conda-forge \
+mamba install -y -p "$ENV_PATH" -c conda-forge -c bioconda \
     libxml2 libcurl openssl zlib bzip2 xz \
     htslib curl
 
