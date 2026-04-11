@@ -105,6 +105,7 @@ fi
 # Conda / Miniforge
 # -----------------------------
 CONDA_BIN=""
+
 if have conda; then
   CONDA_BIN="$(command -v conda)"
   echo "==> Existing conda found: ${CONDA_BIN}"
@@ -114,8 +115,16 @@ elif [[ -x "${HOME}/miniforge3/bin/conda" ]]; then
 else
   echo "==> Installing Miniforge"
   brew install --cask miniforge
-  if [[ -x "${HOME}/miniforge3/bin/conda" ]]; then
-    CONDA_BIN="${HOME}/miniforge3/bin/conda"
+
+  if have conda; then
+    CONDA_BIN="$(command -v conda)"
+    echo "==> Conda found after install: ${CONDA_BIN}"
+  elif [[ -x "/opt/homebrew/bin/conda" ]]; then
+    CONDA_BIN="/opt/homebrew/bin/conda"
+    echo "==> Conda found after install: ${CONDA_BIN}"
+  elif [[ -x "/usr/local/bin/conda" ]]; then
+    CONDA_BIN="/usr/local/bin/conda"
+    echo "==> Conda found after install: ${CONDA_BIN}"
   else
     echo "ERROR: Miniforge installed but conda not found"
     exit 1
