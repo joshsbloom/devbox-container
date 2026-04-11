@@ -134,7 +134,7 @@ fi
 # Initialize conda only if shell rc does not already mention conda init
 if ! grep -Eq 'conda init|miniforge3/bin/conda|# >>> conda initialize >>>' "$SHELL_RC" 2>/dev/null; then
   echo "==> Initializing conda for future shells"
-  "$CONDA_BIN" init "$(basename "${SHELL:-/bin/zsh}")" || true
+  "$CONDA_BIN" init zsh || true
 else
   echo "==> Shell already appears configured for conda"
 fi
