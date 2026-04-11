@@ -168,7 +168,10 @@ conda activate "${ENV_NAME}"
 
 # Ensure a few packages are present even if env already existed
 echo "==> Ensuring core Python packages are installed in '${ENV_NAME}'"
-conda install -y -n "${ENV_NAME}" -c conda-forge \
+conda config --add channels conda-forge || true
+conda config --set channel_priority strict || true
+
+conda install -y -n "${ENV_NAME}" \
   python=3.12 \
   jupyterlab \
   notebook \
@@ -180,7 +183,6 @@ conda install -y -n "${ENV_NAME}" -c conda-forge \
   scikit-learn \
   biopython \
   pysam
-
 # -----------------------------
 # Python Jupyter kernel
 # -----------------------------
