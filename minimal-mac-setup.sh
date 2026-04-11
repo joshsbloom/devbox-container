@@ -143,13 +143,22 @@ fi
 eval "$("$CONDA_BIN" shell.bash hook)"
 
 # -----------------------------
+# Conda channels
+# -----------------------------
+echo "==> Configuring conda channels"
+conda config --remove-key channels >/dev/null 2>&1 || true
+conda config --add channels conda-forge
+conda config --add channels bioconda
+conda config --set channel_priority strict
+
+# -----------------------------
 # Conda environment
 # -----------------------------
 if conda env list | awk '{print $1}' | grep -qx "${ENV_NAME}"; then
   echo "==> Conda environment '${ENV_NAME}' already exists"
 else
   echo "==> Creating conda environment '${ENV_NAME}'"
-  conda create -y -n "${ENV_NAME}" -c conda-forge \
+  conda create -y -n "${ENV_NAME}" -c conda-forge -c bioconda \
     python=3.12 \
     jupyterlab \
     notebook \
@@ -166,12 +175,9 @@ fi
 echo "==> Activating conda environment '${ENV_NAME}'"
 conda activate "${ENV_NAME}"
 
-# Ensure a few packages are present even if env already existed
+# Ensure core packages are present if env already existed
 echo "==> Ensuring core Python packages are installed in '${ENV_NAME}'"
-conda config --add channels conda-forge || true
-conda config --set channel_priority strict || true
-
-conda install -y -n "${ENV_NAME}" \
+conda install -y -n "${ENV_NAME}" -c conda-forge -c bioconda \
   python=3.12 \
   jupyterlab \
   notebook \
@@ -183,6 +189,9 @@ conda install -y -n "${ENV_NAME}" \
   scikit-learn \
   biopython \
   pysam
+
+
+
 # -----------------------------
 # Python Jupyter kernel
 # -----------------------------
