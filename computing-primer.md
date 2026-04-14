@@ -41,16 +41,18 @@ Unlike Docker, Apptainer runs as your user (no daemon, no root), mounts `$HOME` 
 
 It does **not** abstract the kernel — GPU drivers, filesystems, and syscalls still come from the host.
 
-## What does Dropbox abstract?
+## What does Docker abstract?
 
-**Dropbox** is a **file-sync + cloud-storage** service. It abstracts:
+**Docker** is the dominant general-purpose **container platform**. Like Apptainer, it bundles an entire user-space (OS libraries, language runtimes, app code) into an image that runs on top of the host kernel. What it abstracts:
 
-- **Device boundaries.** A folder appears identical on your laptop, desktop, phone, and the web.
-- **Backup & versioning.** Old versions and deleted files are recoverable without you managing snapshots.
-- **Sharing & permissions.** Send a link instead of emailing attachments.
-- **Transport.** You don't think about `rsync`, `scp`, conflict resolution, or which machine has the latest copy — the daemon handles it in the background.
+- **The host OS distribution.** An image built on Ubuntu runs on RHEL, Alpine, macOS, or Windows hosts (via a Linux VM on the latter two).
+- **Dependency hell.** "Works on my machine" → ship the machine. No more mismatched library versions between dev, CI, and prod.
+- **Install & teardown.** `docker run` pulls and starts; `docker rm` wipes it. No package-manager residue on the host.
+- **Networking & ports.** Each container gets its own network namespace; you map ports explicitly.
+- **Layered filesystems.** Images are built from stacked, cached layers (`Dockerfile`), so rebuilds only redo what changed.
+- **Orchestration hooks.** Images are the unit of deployment for Kubernetes, ECS, Compose, etc.
 
-Effectively: "a folder that exists everywhere."
+Key differences from Apptainer: Docker runs via a **root-owned daemon**, isolates `$HOME` by default, and is built for cloud/web services rather than HPC. Apptainer was designed because running a root daemon on a shared cluster is a non-starter.
 
 ## What is conda?
 
@@ -60,7 +62,23 @@ Effectively: "a folder that exists everywhere."
 - Creates isolated **environments** so project A can use Python 3.10 + PyTorch 2.1 while project B uses Python 3.12 + TensorFlow.
 - Does not require root.
 
-**Miniforge** is the recommended minimal installer: it's conda pre-configured to use the community **conda-forge** channel (and works out of the box on Apple Silicon). `mamba` is a faster drop-in solver bundled with Miniforge.
+**Miniforge** is the recommended minimal installer: it's conda pre-configured to use the community **conda-forge** channel (and works out of the box on Apple Silicon). `mamba` is a faster drop-in replacement for `conda` bundled with Miniforge — it's written in C++ and resolves dependencies in parallel, so environment creation that takes minutes with `conda` often takes seconds with `mamba`.
+
+### Using mamba
+
+`mamba` takes the same subcommands and flags as `conda`, so you can almost always just swap the command name:
+
+```bash
+mamba create -n myenv python=3.12 numpy pandas pytorch
+mamba activate myenv        # activate/deactivate still work the same
+mamba install -c conda-forge scikit-learn r-base
+mamba update --all
+mamba env create -f environment.yml
+mamba env remove -n myenv
+mamba search pytorch        # much faster than 'conda search'
+```
+
+Rule of thumb: use `mamba` for anything that touches the solver (`create`, `install`, `update`, `remove`, `env create`). Use `conda` for config and activation (`conda config`, `conda activate`) — both work, but `conda activate` is the canonical one.
 
 ### Setup on macOS (Apple Silicon, arm64)
 
