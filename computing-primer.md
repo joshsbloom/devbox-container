@@ -80,6 +80,46 @@ mamba search pytorch        # much faster than 'conda search'
 
 Rule of thumb: use `mamba` for anything that touches the solver (`create`, `install`, `update`, `remove`, `env create`). Use `conda` for config and activation (`conda config`, `conda activate`) — both work, but `conda activate` is the canonical one.
 
+### Architecture caveats (especially Apple Silicon)
+
+Conda packages are built per-platform. Common "subdirs" you'll see:
+
+- `linux-64` — Linux x86-64 (most common, best coverage).
+- `linux-aarch64` — Linux ARM (NVIDIA Grace, Raspberry Pi, AWS Graviton).
+- `osx-64` — Intel Macs.
+- `osx-arm64` — Apple Silicon (M1/M2/M3/M4).
+- `win-64` — Windows x86-64.
+
+**`osx-arm64` is the problem child.** conda-forge has excellent coverage, but many older or niche channels — especially **bioconda** — still lag behind. You will periodically hit `PackagesNotFoundError: ... current channels: osx-arm64`. What to do:
+
+- **Check conda-forge first.** It's the most complete and most up-to-date channel for arm64. Pin it with strict priority:
+  ```bash
+  conda config --set channel_priority strict
+  conda config --add channels conda-forge
+  ```
+- **Try `pip` as a fallback** *inside* the conda env. Many Python packages ship arm64 wheels on PyPI even when conda builds are missing:
+  ```bash
+  mamba activate myenv
+  pip install somepackage
+  ```
+- **Build from source** if a C/C++/Fortran extension has no wheel. The conda env already provides `clang`, `gfortran`, BLAS, etc., so `pip install --no-binary :all: pkg` often "just works."
+- **Run an x86-64 env via Rosetta 2** when a critical tool (often bioconda: `pysam`, `samtools`, `bcftools`, older bioinformatics pipelines) has no arm64 build. Create a dedicated emulated env:
+  ```bash
+  CONDA_SUBDIR=osx-64 mamba create -n bio_x86 python=3.12 -c bioconda -c conda-forge pysam
+  conda activate bio_x86
+  conda config --env --set subdir osx-64   # make the setting sticky for this env
+  ```
+  This runs ~20–30% slower under Rosetta but unlocks the full `osx-64` ecosystem.
+- **Use a Linux container.** For heavy bioinformatics work on a Mac, Docker Desktop with an `linux-64` or `linux-aarch64` image is often cleaner than fighting arm64 package gaps.
+- **Check bioconda's arm64 status.** Bioconda has been gradually adding `osx-arm64` builds but coverage is incomplete — always check <https://bioconda.github.io/> or the package's GitHub before assuming.
+
+Quick diagnostic for "why won't this install":
+
+```bash
+conda config --show subdir              # what arch am I resolving for?
+mamba search -c conda-forge pkgname     # which subdirs have builds?
+```
+
 ### Setup on macOS (Apple Silicon, arm64)
 
 ```bash
